@@ -86,12 +86,18 @@ jobs:
         continue-on-error: true
 
   # ── Build ─────────────────────────────────────────────────────────────────────
+  # Only runs when registry credentials are configured.
+  # Set AWS_ACCESS_KEY_ID (for ECR) or AZURE_CREDENTIALS (for ACR) as repo secrets
+  # to enable image builds. Without credentials the step is skipped cleanly.
 
   build:
     name: Build and push images
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      (secrets.AWS_ACCESS_KEY_ID != '' || secrets.AZURE_CREDENTIALS != '')
 
     strategy:
       fail-fast: false
