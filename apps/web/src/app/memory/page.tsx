@@ -66,7 +66,7 @@ export default function MemoryPage() {
               </span>
             </div>
             <p style={{ fontSize: 13, marginBottom: 0 }}>{entry.content}</p>
-            {entry.extra.tags && Array.isArray(entry.extra.tags) && (
+            {Array.isArray(entry.extra.tags) && (
               <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
                 {(entry.extra.tags as string[]).map((tag) => (
                   <code key={tag} style={{ fontSize: 11, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 6px" }}>
