@@ -1,8 +1,8 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json ./
-# No lockfile in repo — install and generate one
-RUN npm install
+# Copy both manifest and lockfile so npm ci can do a clean, reproducible install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -16,7 +16,6 @@ ENV NODE_ENV=production
 # next.config.js sets output: 'standalone' — copy the self-contained bundle
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public 2>/dev/null || true
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
