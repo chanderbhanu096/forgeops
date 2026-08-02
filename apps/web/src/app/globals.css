@@ -215,6 +215,122 @@ textarea { resize: vertical; min-height: 100px; }
   border-radius: 6px;
 }
 
+/* ── Command-centre panel ────────────────────────────────────────────────── */
+/*
+  One outer border wrapping both columns.
+  The vertical divider is border-right on .cmd-left — it stretches the full
+  height automatically because grid children default to align-items: stretch.
+  No gap: 0 so the divider butts up against the padding of each column.
+*/
+
+.cmd-panel {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  /* Flat border — no border-radius so the column divider meets the outer
+     border at a sharp corner with zero sub-pixel gap. overflow:hidden is
+     not needed without radius, so the divider line is never clipped. */
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+}
+
+.cmd-left {
+  padding: 16px 18px;
+  /* border-right IS the vertical divider. CSS grid stretches both children
+     to the same height, so this line always runs from top to bottom of the
+     panel regardless of which column is taller. */
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  /* Prevent any margin/gap from the column header breaking alignment */
+  min-width: 0;
+}
+
+.cmd-right {
+  padding: 16px 20px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.cmd-col-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.cmd-activity-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+  min-height: 20px;
+}
+
+/* Test result rows */
+.cmd-tests {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.cmd-test-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.cmd-test-row.pass  { color: var(--green); }
+.cmd-test-row.fail  { color: var(--red); }
+.cmd-test-row.running { color: var(--orange); }
+
+.cmd-test-count {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  min-width: 28px;
+  line-height: 1;
+}
+
+/* Stats strip */
+.cmd-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.cmd-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cmd-stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cmd-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+@media (max-width: 700px) {
+  .cmd-panel { grid-template-columns: 1fr; }
+  .cmd-left  { border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+/* kept for any page that still uses two-col */
 .two-col { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
 @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 

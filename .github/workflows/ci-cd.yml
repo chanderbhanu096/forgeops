@@ -87,8 +87,15 @@ jobs:
 
   # ── Build ─────────────────────────────────────────────────────────────────────
   # Only runs when registry credentials are configured.
-  # Set AWS_ACCESS_KEY_ID (for ECR) or AZURE_CREDENTIALS (for ACR) as repo secrets
-  # to enable image builds. Without credentials the step is skipped cleanly.
+  #
+  # How to enable:
+  #   1. Go to repo Settings → Variables → Actions
+  #   2. Add a repository variable:  REGISTRY_CONFIGURED = true
+  #   3. Add the matching secrets (AWS_ACCESS_KEY_ID / AZURE_CREDENTIALS, etc.)
+  #
+  # GitHub Actions does NOT allow secrets to be compared in job-level `if:`
+  # conditions — only repository variables (vars.*) work there.
+  # Without REGISTRY_CONFIGURED the build job is cleanly skipped.
 
   build:
     name: Build and push images
@@ -97,7 +104,7 @@ jobs:
     if: >
       github.ref == 'refs/heads/main' &&
       github.event_name == 'push' &&
-      (secrets.AWS_ACCESS_KEY_ID != '' || secrets.AZURE_CREDENTIALS != '')
+      vars.REGISTRY_CONFIGURED == 'true'
 
     strategy:
       fail-fast: false
