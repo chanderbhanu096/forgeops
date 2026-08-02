@@ -282,37 +282,32 @@ The system can propose updated instructions, new skill versions or new evaluatio
 
 ## Quick start (5 minutes)
 
+> **Full instructions** for every scenario — local, no-Docker, AWS, Azure, observability, real tool connections — are in **[SETUP.md](SETUP.md)**.
+
 ### Prerequisites
 
-- Docker Desktop (or Docker + Docker Compose v2)
-- An OpenAI API key
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker + Compose v2)
+- An OpenAI API key — [platform.openai.com](https://platform.openai.com)
 
-### 1. Clone
+### 1. Clone and configure
 
 ```bash
 git clone https://github.com/chanderbhanu096/forgeops.git
 cd forgeops
-```
-
-### 2. Configure
-
-```bash
 cp .env.example .env
+# Open .env — set OPENAI_API_KEY=sk-...
 ```
 
-Open `.env` and set your `OPENAI_API_KEY`. Everything else has working defaults for local development.
-
-### 3. Start
+### 2. Start
 
 ```bash
 docker compose up -d
 ```
 
-This starts: PostgreSQL 16 with pgvector · Redis 7 · the API server · the Mission Control UI · all three MCP servers · the sandbox executor.
+Starts: PostgreSQL 16 + pgvector · Redis 7 · API server · Mission Control UI · 3 MCP servers · sandbox executor.
+First build: **~3 min**. Subsequent starts: **~15 sec**.
 
-First build takes ~3 minutes. Subsequent starts take ~15 seconds.
-
-### 4. Open
+### 3. Open
 
 | URL | What it is |
 |---|---|
@@ -320,17 +315,17 @@ First build takes ~3 minutes. Subsequent starts take ~15 seconds.
 | http://localhost:8000/docs | Interactive API docs (Swagger) |
 | http://localhost:8000/metrics | Prometheus metrics |
 
-### 5. Submit a mission
+### 4. Submit your first mission
 
-Open Mission Control, click **New Mission**, and type:
+Open Mission Control → **New Mission** → paste this → **Start**:
 
 ```
-Investigate why the customer revenue pipeline is reporting 18% lower 
-revenue after yesterday's deployment. Find the root cause and create 
+Investigate why the customer revenue pipeline is reporting 18% lower
+revenue after yesterday's deployment. Find the root cause and create
 a pull request with the fix.
 ```
 
-Watch the execution graph update in real time.
+Watch the **Execution Graph** update live. When the agent reaches **HUMAN APPROVAL**, review the diff and evidence in the Approval Centre, then click **Approve**.
 
 ---
 
