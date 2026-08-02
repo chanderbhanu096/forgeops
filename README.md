@@ -290,7 +290,7 @@ The system can propose updated instructions, new skill versions or new evaluatio
 ### 1. Clone
 
 ```bash
-git clone https://github.com/your-org/forgeops.git
+git clone https://github.com/chanderbhanu096/forgeops.git
 cd forgeops
 ```
 
