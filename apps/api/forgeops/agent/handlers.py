@@ -250,7 +250,9 @@ async def handle_hypothesis_creation(
     ]
 
     top = hypotheses[0] if hypotheses else None
-    log.info("hypotheses_generated", count=len(hypotheses), top_confidence=top.confidence if top else 0)
+    log.info(
+        "hypotheses_generated", count=len(hypotheses), top_confidence=top.confidence if top else 0
+    )
     return {"hypotheses": hypotheses, "top_hypothesis": top}
 
 
@@ -500,7 +502,7 @@ async def handle_execution(
     log.info("execution_started", patch_size=len(ctx.proposed_patch or ""))
 
     # Placeholder: v2 calls mcp-github create_pull_request
-    pr_url = f"https://github.com/example/repo/pull/42"
+    pr_url = "https://github.com/example/repo/pull/42"
     log.info("pull_request_created", url=pr_url)
 
     return {

@@ -86,7 +86,7 @@ async def reviewer_agent(
     Returns specific change requests if the patch is not yet acceptable.
     """
     prior_context = (
-        f"\nPrior review comments addressed:\n" + "\n".join(f"- {c}" for c in prior_comments)
+        "\nPrior review comments addressed:\n" + "\n".join(f"- {c}" for c in prior_comments)
         if prior_comments
         else ""
     )
@@ -196,7 +196,8 @@ async def security_agent(patch: str) -> SecurityOutput:
                 f"Patch:\n{patch[:4000]}\n\n"
                 "Return JSON:\n"
                 "  approved: bool\n"
-                "  findings: list of { severity: critical|high|medium|low, title: string, detail: string }\n"
+                "  findings: list of"
+                " { severity: critical|high|medium|low, title: string, detail: string }\n"
                 "  blocked_by: list[string]  (short names of blocking issues)"
             ),
         },

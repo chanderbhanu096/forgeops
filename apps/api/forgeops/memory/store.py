@@ -216,7 +216,7 @@ class MemoryStore:
         Keyword search over memory content using PostgreSQL trigram similarity.
         Fallback when vector embeddings are unavailable.
         """
-        from sqlalchemy import or_, func
+        from sqlalchemy import or_
 
         stmt = select(MemoryEntry).order_by(MemoryEntry.usefulness_score.desc()).limit(limit)
 
@@ -245,7 +245,7 @@ class MemoryStore:
         """
         try:
             from pgvector.sqlalchemy import Vector
-            from sqlalchemy import cast, text
+            from sqlalchemy import cast
 
             # Use pgvector cosine distance operator
             distance_expr = MemoryEntry.embedding.op("<=>", return_type=None)(

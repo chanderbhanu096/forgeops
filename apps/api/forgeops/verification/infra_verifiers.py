@@ -15,20 +15,27 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any  # noqa: F401 — kept for consistency across verifier modules
 
 from forgeops.verification.base import Finding, Severity, VerifierResult
-
 
 # ── Patterns: destructive ─────────────────────────────────────────────────────
 
 _DESTRUCTIVE_PATTERNS: list[tuple[str, str, Severity]] = [
     (r"\bforce_destroy\s*=\s*true\b", "force_destroy = true on a resource", Severity.critical),
     (r"\bdelete_on_termination\s*=\s*true\b", "EBS delete_on_termination = true", Severity.high),
-    (r"\blifecycle\s*\{[^}]*prevent_destroy\s*=\s*false", "prevent_destroy disabled", Severity.high),
+    (
+        r"\blifecycle\s*\{[^}]*prevent_destroy\s*=\s*false",
+        "prevent_destroy disabled",
+        Severity.high,
+    ),
     (r"\bskip_final_snapshot\s*=\s*true\b", "RDS skip_final_snapshot = true", Severity.high),
     (r"\bterraform\s+destroy\b", "terraform destroy command in IaC", Severity.critical),
-    (r"\bdeletion_protection\s*=\s*false\b", "deletion_protection explicitly disabled", Severity.medium),
+    (
+        r"\bdeletion_protection\s*=\s*false\b",
+        "deletion_protection explicitly disabled",
+        Severity.medium,
+    ),
 ]
 
 # ── Patterns: security misconfigurations ──────────────────────────────────────
@@ -56,7 +63,7 @@ class TerraformDestructiveChangeVerifier:
 
     name: str = "terraform_destructive"
 
-    def verify(self, terraform_content: str, **_: Any) -> VerifierResult:
+    def verify(self, terraform_content: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
 
         for pattern, title, severity in _DESTRUCTIVE_PATTERNS:
@@ -83,7 +90,7 @@ class TerraformSecurityVerifier:
 
     name: str = "terraform_security"
 
-    def verify(self, terraform_content: str, **_: Any) -> VerifierResult:
+    def verify(self, terraform_content: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
 
         for pattern, title, severity in _SECURITY_PATTERNS:

@@ -10,7 +10,6 @@ from typing import Any
 import structlog
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageParam
 
 from forgeops.config import get_settings
 
@@ -67,7 +66,7 @@ class ModelGateway:
         max_tokens: int = 4096,
         response_format: dict[str, Any] | None = None,
         _handler: str = "unknown",
-    ) -> "ModelResponse":
+    ) -> ModelResponse:
         model = model or self._settings.primary_model
         t0 = time.monotonic()
 
@@ -106,7 +105,7 @@ class ModelGateway:
             self._emit_trace(response, latency_ms, _handler)
             return response
 
-    def _emit_trace(self, response: "ModelResponse", latency_ms: int, handler: str) -> None:
+    def _emit_trace(self, response: ModelResponse, latency_ms: int, handler: str) -> None:
         """Fire-and-forget Langfuse trace. Never raises."""
         try:
             from forgeops.observability import get_langfuse
@@ -126,8 +125,8 @@ class ModelGateway:
     async def fast_chat(
         self,
         messages: list[dict[str, Any]],
-        **kwargs: Any,
-    ) -> "ModelResponse":
+        **kwargs: object,
+    ) -> ModelResponse:
         """Use the fast/cheap model for classification and routing tasks."""
         return await self.chat(messages, model=self._settings.fast_model, **kwargs)
 
@@ -142,7 +141,7 @@ class ModelGateway:
         temperature: float,
         max_tokens: int,
         response_format: dict[str, Any] | None,
-    ) -> "ModelResponse":
+    ) -> ModelResponse:
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -194,7 +193,7 @@ class ModelGateway:
         model: str,
         temperature: float,
         max_tokens: int,
-    ) -> "ModelResponse":
+    ) -> ModelResponse:
         assert self._anthropic is not None
 
         # Convert OpenAI message format to Anthropic format

@@ -14,6 +14,9 @@ from forgeops.db import get_db
 from forgeops.memory.store import MemoryStore
 from forgeops.models.orm import MemoryType
 
+# FastAPI Depends() in function signatures is intentional — noqa comments below
+# suppress the B008 lint rule for each endpoint.
+
 router = APIRouter()
 
 
@@ -27,7 +30,7 @@ class FeedbackRequest(BaseModel):
 @router.get("/missions/{mission_id}", response_model=list[dict[str, Any]])
 async def get_mission_memory(
     mission_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """Return all memory entries for a specific mission."""
     store = MemoryStore(db)
@@ -48,7 +51,7 @@ async def get_mission_memory(
 @router.get("/procedural", response_model=list[dict[str, Any]])
 async def get_procedural_memory(
     limit: int = 20,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """Return the top procedural strategies ordered by usefulness."""
     store = MemoryStore(db)
@@ -67,7 +70,7 @@ async def get_procedural_memory(
 @router.post("/feedback", status_code=200)
 async def record_feedback(
     body: FeedbackRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> dict[str, str]:
     """Record a human feedback signal for a mission decision."""
     store = MemoryStore(db)
@@ -86,7 +89,7 @@ async def search_memory(
     query: str,
     memory_type: str | None = None,
     limit: int = 10,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """Text search over agent memory."""
     store = MemoryStore(db)

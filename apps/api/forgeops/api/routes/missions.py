@@ -42,7 +42,7 @@ class MissionSummary(BaseModel):
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_orm(cls, m: Mission) -> "MissionSummary":
+    def from_orm(cls, m: Mission) -> MissionSummary:
         result_data = m.result or {}
         return cls(
             id=m.id,
@@ -65,7 +65,7 @@ class MissionDetail(MissionSummary):
     error: str | None = None
 
     @classmethod
-    def from_orm(cls, m: Mission) -> "MissionDetail":  # type: ignore[override]
+    def from_orm(cls, m: Mission) -> MissionDetail:  # type: ignore[override]
         result_data = m.result or {}
         return cls(
             id=m.id,
@@ -92,7 +92,7 @@ class MissionDetail(MissionSummary):
 async def create_mission(
     body: CreateMissionRequest,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> MissionDetail:
     """Create a new mission and immediately enqueue it for execution."""
     from forgeops.config import get_settings
@@ -117,7 +117,7 @@ async def create_mission(
 
 @router.get("", response_model=list[MissionSummary])
 async def list_missions(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
     limit: int = 20,
     offset: int = 0,
 ) -> list[MissionSummary]:
@@ -129,7 +129,7 @@ async def list_missions(
 
 @router.get("/{mission_id}", response_model=MissionDetail)
 async def get_mission(
-    mission_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    mission_id: uuid.UUID, db: AsyncSession = Depends(get_db)  # noqa: B008
 ) -> MissionDetail:
     mission = await _get_or_404(db, mission_id)
     return MissionDetail.from_orm(mission)
@@ -137,7 +137,7 @@ async def get_mission(
 
 @router.post("/{mission_id}/pause", status_code=status.HTTP_200_OK)
 async def pause_mission(
-    mission_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    mission_id: uuid.UUID, db: AsyncSession = Depends(get_db)  # noqa: B008
 ) -> dict[str, str]:
     mission = await _get_or_404(db, mission_id)
     if mission.status != MissionStatus.running:
@@ -154,7 +154,7 @@ async def pause_mission(
 async def resume_mission(
     mission_id: uuid.UUID,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> dict[str, str]:
     mission = await _get_or_404(db, mission_id)
     if mission.status != MissionStatus.paused:

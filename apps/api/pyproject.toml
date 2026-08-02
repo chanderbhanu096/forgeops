@@ -69,7 +69,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "ANN", "B", "SIM"]
-ignore = ["ANN101", "ANN102"]
+ignore = [
+    "UP017",    # Use `datetime.UTC` — we target Python 3.11; timezone.utc is cleaner
+    "ANN401",   # Dynamically typed Any in **kwargs — intentional in verifier base methods
+]
 
 [tool.mypy]
 python_version = "3.11"

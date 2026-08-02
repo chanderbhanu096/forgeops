@@ -164,11 +164,13 @@ class AgentRuntime:
                 return
 
             # ── Human approval gate ────────────────────────────────────────
-            if mission.current_state == AgentState.human_approval:
-                if fresh.status != MissionStatus.approved:
-                    self._log.info("awaiting_human_approval")
-                    yield self._event("awaiting_approval", {})
-                    return  # runtime resumes when approval webhook fires
+            if (
+                mission.current_state == AgentState.human_approval
+                and fresh.status != MissionStatus.approved
+            ):
+                self._log.info("awaiting_human_approval")
+                yield self._event("awaiting_approval", {})
+                return  # runtime resumes when approval webhook fires
 
             # ── Determine next state ───────────────────────────────────────
             next_state = self._next_runnable_state(mission.current_state)
@@ -198,7 +200,7 @@ class AgentRuntime:
                     "cost_usd": mission.cost_usd_used,
                 })
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 await self._fail(mission, ctx, f"Handler timed out in state {next_state}")
                 yield self._event("failed", {"reason": "timeout", "state": next_state})
                 return

@@ -34,7 +34,6 @@ at any point by returning needs_more_evidence=True from a handler.
 from __future__ import annotations
 
 import re
-import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -97,7 +96,7 @@ class BM25Index:
         tokens = _tokenise(query)
         scores = self._bm25.get_scores(tokens)
         ranked = sorted(
-            zip(self._documents, scores.tolist()),
+            zip(self._documents, scores.tolist(), strict=False),
             key=lambda x: x[1],
             reverse=True,
         )
@@ -369,7 +368,8 @@ class RetrievalOrchestrator:
                     f"Break into at most {max_sub_queries} sub-queries. "
                     "Available sources: repository, logs, incidents, schema, docs, memory\n\n"
                     "Return JSON:\n"
-                    "  sub_queries: list of { query: string, source: string, priority: high|medium|low }"
+                    "  sub_queries: list of"
+                    " { query: string, source: string, priority: high|medium|low }"
                 ),
             },
         ]
@@ -409,7 +409,9 @@ class RetrievalOrchestrator:
         messages = [
             {
                 "role": "system",
-                "content": "Assess whether the retrieved evidence is sufficient to answer the question.",
+                "content": (
+                    "Assess whether the retrieved evidence is sufficient to answer the question."
+                ),
             },
             {
                 "role": "user",

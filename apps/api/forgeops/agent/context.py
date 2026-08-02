@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
-from forgeops.models.orm import AgentState, Mission
+from forgeops.models.orm import Mission
 
 
 @dataclass
@@ -92,7 +91,7 @@ class MissionContext:
     # ── Factory ───────────────────────────────────────────────────────────────
 
     @classmethod
-    async def from_mission(cls, mission: Mission) -> "MissionContext":
+    async def from_mission(cls, mission: Mission) -> MissionContext:
         """Restore from a persisted checkpoint, or create fresh."""
         if mission.checkpoint:
             return cls._from_checkpoint(mission.checkpoint, mission)
@@ -164,7 +163,9 @@ class MissionContext:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def add_evidence(self, source: str, content: str, metadata: dict[str, Any] | None = None) -> None:
+    def add_evidence(
+        self, source: str, content: str, metadata: dict[str, Any] | None = None
+    ) -> None:
         self.raw_evidence.append({
             "source": source,
             "content": content,
@@ -178,7 +179,7 @@ class MissionContext:
     # ── Private ───────────────────────────────────────────────────────────────
 
     @classmethod
-    def _from_checkpoint(cls, cp: dict[str, Any], mission: Mission) -> "MissionContext":
+    def _from_checkpoint(cls, cp: dict[str, Any], mission: Mission) -> MissionContext:
         ctx = cls(
             mission_id=mission.id,
             title=cp.get("title", mission.title),

@@ -35,7 +35,7 @@ class ApprovalResponse(BaseModel):
 
 @router.get("/pending", response_model=list[ApprovalResponse])
 async def list_pending_approvals(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> list[ApprovalResponse]:
     result = await db.execute(
         select(Approval)
@@ -61,7 +61,7 @@ async def decide_approval(
     approval_id: uuid.UUID,
     body: ApprovalDecisionRequest,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> dict[str, str]:
     """Record a human approval or rejection and resume the mission."""
     result = await db.execute(select(Approval).where(Approval.id == approval_id))
@@ -84,7 +84,7 @@ async def decide_approval(
     approval.decision = ApprovalDecision[body.decision]
     approval.reviewer_id = body.reviewer_id
     approval.reviewer_notes = body.notes
-    approval.decided_at = datetime.now(timezone.utc)
+    approval.decided_at = datetime.now(timezone.utc)  # noqa: UP017
 
     # Update mission status
     mission_result = await db.execute(

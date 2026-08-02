@@ -14,12 +14,9 @@ from __future__ import annotations
 
 import ast
 import re
-import textwrap
 from dataclasses import dataclass
-from typing import Any
 
 from forgeops.verification.base import Finding, Severity, VerifierResult
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -40,9 +37,7 @@ def _extract_python_from_patch(patch: str) -> dict[str, str]:
                 files[current_file] = "\n".join(current_lines)
             current_file = line[6:].strip()
             current_lines = []
-        elif line.startswith("+") and not line.startswith("+++"):
-            current_lines.append(line[1:])
-        elif line.startswith(" "):
+        elif line.startswith(("+", " ")) and not line.startswith("+++"):
             current_lines.append(line[1:])
 
     if current_file and current_lines:
@@ -60,7 +55,7 @@ class PatchSyntaxVerifier:
 
     name: str = "patch_syntax"
 
-    def verify(self, patch: str, **_: Any) -> VerifierResult:
+    def verify(self, patch: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
         python_files = _extract_python_from_patch(patch)
 
@@ -124,7 +119,7 @@ class DangerousPatternVerifier:
 
     name: str = "dangerous_patterns"
 
-    def verify(self, patch: str, **_: Any) -> VerifierResult:
+    def verify(self, patch: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
 
         for pattern, title, severity in _DANGEROUS_PATTERNS:
@@ -177,7 +172,7 @@ class ImportVerifier:
 
     name: str = "import_check"
 
-    def verify(self, patch: str, **_: Any) -> VerifierResult:
+    def verify(self, patch: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
         python_files = _extract_python_from_patch(patch)
 
@@ -193,10 +188,9 @@ class ImportVerifier:
                     for alias in node.names:
                         module = alias.name.split(".")[0]
                         self._check_module(module, filename, node.lineno, findings)
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        module = node.module.split(".")[0]
-                        self._check_module(module, filename, node.lineno, findings)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    module = node.module.split(".")[0]
+                    self._check_module(module, filename, node.lineno, findings)
 
         return VerifierResult(
             verifier_name=self.name,
@@ -240,7 +234,9 @@ class PatchSizeVerifier:
     max_changed_lines: int = 500
     max_changed_files: int = 20
 
-    def verify(self, patch: str, changed_files: list[str] | None = None, **_: Any) -> VerifierResult:
+    def verify(
+        self, patch: str, changed_files: list[str] | None = None, **_: object
+    ) -> VerifierResult:
         findings: list[Finding] = []
         changed_lines = sum(
             1 for line in patch.splitlines()

@@ -13,7 +13,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from forgeops.cache import get_redis
@@ -54,14 +54,17 @@ async def _event_generator(
 
     try:
         while True:
-            message = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True), timeout=30.0)
+            message = await asyncio.wait_for(
+                pubsub.get_message(ignore_subscribe_messages=True),
+                timeout=30.0,
+            )
             if message and message["type"] == "message":
                 raw = message["data"]
                 yield f"data: {raw}\n\n"
             else:
                 # Keepalive ping
                 yield ": ping\n\n"
-    except asyncio.TimeoutError:
+    except TimeoutError:
         yield "data: {\"type\": \"timeout\"}\n\n"
     except Exception as exc:
         log.error("sse_stream_error", error=str(exc))

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
 
 from forgeops.verification.base import Finding, Severity, VerifierResult
 
@@ -49,7 +48,10 @@ _WRITE_KEYWORDS: frozenset[str] = frozenset({
 
 # Patterns that look like SQL injection or privilege escalation attempts
 _INJECTION_PATTERNS: list[tuple[str, str]] = [
-    (r";\s*(DROP|CREATE|ALTER|TRUNCATE|DELETE|INSERT|UPDATE)\b", "Stacked write statement after semicolon"),
+    (
+        r";\s*(DROP|CREATE|ALTER|TRUNCATE|DELETE|INSERT|UPDATE)\b",
+        "Stacked write statement after semicolon",
+    ),
     (r"\bUNION\s+ALL\s+SELECT\b", "UNION ALL SELECT (possible injection)"),
     (r"\bINTO\s+OUTFILE\b", "INTO OUTFILE (file write via SQL)"),
     (r"\bLOAD_FILE\s*\(", "LOAD_FILE() (file read via SQL)"),
@@ -75,7 +77,7 @@ class SQLStatementTypeVerifier:
 
     name: str = "sql_statement_type"
 
-    def verify(self, sql: str, **_: Any) -> VerifierResult:
+    def verify(self, sql: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
         first = _first_token(sql)
 
@@ -110,7 +112,7 @@ class SQLInjectionVerifier:
 
     name: str = "sql_injection"
 
-    def verify(self, sql: str, **_: Any) -> VerifierResult:
+    def verify(self, sql: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
         normalised = _normalise(sql)
 
@@ -136,7 +138,7 @@ class SQLRiskVerifier:
 
     name: str = "sql_risk"
 
-    def verify(self, sql: str, **_: Any) -> VerifierResult:
+    def verify(self, sql: str, **_: object) -> VerifierResult:
         findings: list[Finding] = []
         normalised = _normalise(sql)
 
@@ -164,7 +166,7 @@ class SQLRowLimitVerifier:
     name: str = "sql_row_limit"
     default_max_rows: int = 10_000
 
-    def verify(self, sql: str, max_rows: int | None = None, **_: Any) -> VerifierResult:
+    def verify(self, sql: str, max_rows: int | None = None, **_: object) -> VerifierResult:
         findings: list[Finding] = []
         limit = max_rows or self.default_max_rows
         normalised = _normalise(sql)

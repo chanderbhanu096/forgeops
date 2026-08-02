@@ -7,7 +7,6 @@ persisted to the skills table for history and audit.
 """
 from __future__ import annotations
 
-import importlib.resources
 from pathlib import Path
 from typing import Any
 
@@ -97,7 +96,7 @@ class SkillRegistry:
 
     def list_skills(self) -> list[dict[str, Any]]:
         result = []
-        for name, versions in self._skills.items():
+        for _name, versions in self._skills.items():
             latest_version = sorted(versions.keys(), key=_semver_key)[-1]
             spec = versions[latest_version]
             result.append({

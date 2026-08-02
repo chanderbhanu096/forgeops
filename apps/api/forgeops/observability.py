@@ -17,10 +17,9 @@ no tracing rather than a startup failure.
 """
 from __future__ import annotations
 
-import time
-from contextlib import asynccontextmanager, contextmanager
-from functools import wraps
-from typing import Any, Callable
+from collections.abc import Generator
+from contextlib import contextmanager
+from typing import Any
 
 import structlog
 
@@ -35,11 +34,12 @@ def setup_otel(service_name: str = "forgeops-api") -> None:
     or OTEL_EXPORTER_OTLP_ENDPOINT is not set.
     """
     try:
+        import os
+
         from opentelemetry import trace
+        from opentelemetry.sdk.resources import SERVICE_NAME, Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
-        from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-        import os
 
         endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
         if not endpoint:
@@ -62,7 +62,7 @@ def setup_otel(service_name: str = "forgeops-api") -> None:
         log.warning("otel_setup_failed", error=str(exc))
 
 
-def get_tracer(name: str) -> Any:
+def get_tracer(name: str) -> object:
     try:
         from opentelemetry import trace
         return trace.get_tracer(name)
@@ -72,14 +72,14 @@ def get_tracer(name: str) -> Any:
 
 class _NoopTracer:
     @contextmanager
-    def start_as_current_span(self, name: str, **_: Any):  # type: ignore[override]
+    def start_as_current_span(self, name: str, **_: object) -> Generator[_NoopSpan, None, None]:
         yield _NoopSpan()
 
 
 class _NoopSpan:
-    def set_attribute(self, *_: Any) -> None: pass
-    def set_status(self, *_: Any) -> None: pass
-    def record_exception(self, *_: Any) -> None: pass
+    def set_attribute(self, *_: object) -> None: pass
+    def set_status(self, *_: object) -> None: pass
+    def record_exception(self, *_: object) -> None: pass
 
 
 # ── Langfuse LLM tracing ──────────────────────────────────────────────────────
@@ -149,10 +149,9 @@ class LangfuseTracer:
 
     def flush(self) -> None:
         if self._enabled and self._client:
-            try:
+            from contextlib import suppress
+            with suppress(Exception):
                 self._client.flush()
-            except Exception:
-                pass
 
 
 # ── Singletons ────────────────────────────────────────────────────────────────

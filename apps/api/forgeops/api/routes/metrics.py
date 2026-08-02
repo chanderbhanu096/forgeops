@@ -20,7 +20,14 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy import func, select
 
 from forgeops.db import get_session_factory
-from forgeops.models.orm import Approval, ApprovalDecision, Mission, MissionStatus, ToolCall, ToolCallStatus
+from forgeops.models.orm import (
+    Approval,
+    ApprovalDecision,
+    Mission,
+    MissionStatus,
+    ToolCall,
+    ToolCallStatus,
+)
 
 router = APIRouter()
 

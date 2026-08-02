@@ -7,57 +7,68 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     DateTime,
-    Enum as SAEnum,
     Float,
     ForeignKey,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB as _PGjsonb, UUID as _PGUUID
+from sqlalchemy import (
+    Enum as SAEnum,
+)
+from sqlalchemy.dialects.postgresql import JSONB as _PGjsonb  # noqa: N811
+from sqlalchemy.dialects.postgresql import UUID as _PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import TypeDecorator, String as SaString
+from sqlalchemy.types import String as SaString
+from sqlalchemy.types import TypeDecorator
 
 from forgeops.db import Base
 
 # ── Cross-database type helpers ───────────────────────────────────────────────
 # _JSONB — JSONB in PostgreSQL, JSON elsewhere (for tests using SQLite)
 
-class _JSONB(TypeDecorator):
+
+class _JSONB(TypeDecorator[Any]):
     """JSONB on PostgreSQL, JSON on everything else."""
+
     impl = JSON
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):  # type: ignore[override]
-        if dialect.name == "postgresql":
-            return dialect.type_descriptor(_PGjsonb())
-        return dialect.type_descriptor(JSON())
+    def load_dialect_impl(self, dialect: object) -> object:  # type: ignore[override]
+        if getattr(dialect, "name", None) == "postgresql":
+            return dialect.type_descriptor(_PGjsonb())  # type: ignore[union-attr]
+        return dialect.type_descriptor(JSON())  # type: ignore[union-attr]
 
 
-class _UUID(TypeDecorator):
+class _UUID(TypeDecorator[uuid.UUID]):
     """Native UUID on PostgreSQL, String(36) on SQLite."""
+
     impl = SaString(36)
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):  # type: ignore[override]
-        if dialect.name == "postgresql":
-            return dialect.type_descriptor(_PGUUID(as_uuid=True))
-        return dialect.type_descriptor(SaString(36))
+    def load_dialect_impl(self, dialect: object) -> object:  # type: ignore[override]
+        if getattr(dialect, "name", None) == "postgresql":
+            return dialect.type_descriptor(_PGUUID(as_uuid=True))  # type: ignore[union-attr]
+        return dialect.type_descriptor(SaString(36))  # type: ignore[union-attr]
 
-    def process_bind_param(self, value, dialect):  # type: ignore[override]
+    def process_bind_param(  # type: ignore[override]
+        self, value: uuid.UUID | str | None, dialect: object
+    ) -> str | uuid.UUID | None:
         if value is None:
             return None
-        if dialect.name == "postgresql":
+        if getattr(dialect, "name", None) == "postgresql":
             return value
         return str(value)
 
-    def process_result_value(self, value, dialect):  # type: ignore[override]
+    def process_result_value(  # type: ignore[override]
+        self, value: str | uuid.UUID | None, dialect: object
+    ) -> uuid.UUID | None:
         if value is None:
             return None
         if isinstance(value, uuid.UUID):
@@ -68,13 +79,14 @@ class _UUID(TypeDecorator):
 # pgvector — optional (skipped in SQLite test environments)
 try:
     from pgvector.sqlalchemy import Vector as _Vector
+
     _VECTOR_AVAILABLE = True
 except ImportError:
     _VECTOR_AVAILABLE = False
     _Vector = None  # type: ignore[assignment]
 
 
-def _vector_column(dims: int):  # type: ignore[return]
+def _vector_column(dims: int) -> Mapped[list[float] | None]:  # type: ignore[return-value]
     if _VECTOR_AVAILABLE and _Vector is not None:
         return mapped_column(_Vector(dims), nullable=True)
     return mapped_column(JSON, nullable=True)
@@ -226,7 +238,9 @@ class StateTransition(Base):
         SAEnum(AgentState, name="agent_state"), nullable=False
     )
     trigger: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    extra: Mapped[dict[str, Any]] = mapped_column("metadata", _JSONB(), default=dict, nullable=False)
+    extra: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", _JSONB(), default=dict, nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -327,7 +341,9 @@ class MemoryEntry(Base):
     )
 
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    extra: Mapped[dict[str, Any]] = mapped_column("metadata", _JSONB(), default=dict, nullable=False)
+    extra: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", _JSONB(), default=dict, nullable=False
+    )
 
     # Vector embedding for semantic search (text-embedding-3-small → 1536 dims)
     embedding: Mapped[list[float] | None] = _vector_column(1536)
