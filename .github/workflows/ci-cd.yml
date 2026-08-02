@@ -5,7 +5,7 @@
 #   2. On push to main: build Docker images, push to registry, deploy
 #
 # Supports both AWS ECS and Azure Container Apps.
-# Set DEPLOY_TARGET secret to "aws" or "azure" to select the target.
+# Set DEPLOY_TARGET variable to "aws" or "azure" to select the target.
 # Defaults to "aws" if not set.
 
 name: CI / CD
@@ -22,59 +22,60 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  # ── Test ────────────────────────────────────────────────────────────────────
+  # ── Test ──────────────────────────────────────────────────────────────────────
 
   test:
     name: Lint + typecheck + tests
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_DB: forgeops_test
-          POSTGRES_USER: forgeops
-          POSTGRES_PASSWORD: test_password
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
+    # Tests use SQLite in-memory — no postgres/redis service containers needed.
+    # The DATABASE_URL and REDIS_URL below are set to satisfy Settings validation
+    # but the test conftest overrides the engine with SQLite before any I/O runs.
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            apps/api/.venv
+          key: poetry-${{ env.PYTHON_VERSION }}-${{ hashFiles('apps/api/pyproject.toml') }}
+          restore-keys: |
+            poetry-${{ env.PYTHON_VERSION }}-
+
+      - name: Install Poetry
+        run: |
+          pip install --upgrade pip
+          pip install poetry==1.8.3
+          poetry config virtualenvs.in-project true
 
       - name: Install Python dependencies
         working-directory: apps/api
-        run: pip install -e ".[dev]" 2>/dev/null || pip install -r requirements-dev.txt 2>/dev/null || pip install poetry && poetry install
+        run: poetry install --with dev --no-interaction
 
       - name: Ruff lint
         working-directory: apps/api
-        run: python -m ruff check forgeops/ || true   # non-blocking in CI for now
+        run: poetry run ruff check forgeops/ --output-format=github
 
       - name: Run tests
         working-directory: apps/api
         env:
-          DATABASE_URL: postgresql+asyncpg://forgeops:test_password@localhost:5432/forgeops_test
-          REDIS_URL: redis://localhost:6379
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-test' }}
+          # Dummy values — conftest replaces the DB engine with SQLite in-memory
+          DATABASE_URL: "postgresql+asyncpg://forgeops:test@localhost:5432/forgeops_test"
+          REDIS_URL: "redis://localhost:6379"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-test-placeholder' }}
           ENVIRONMENT: development
+          PYTHONPATH: "."
         run: |
-          python -m pytest tests/ -v --tb=short --cov=forgeops --cov-report=xml
+          poetry run pytest tests/ -v --tb=short \
+            --cov=forgeops --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage
         if: always()
@@ -84,7 +85,7 @@ jobs:
           flags: backend
         continue-on-error: true
 
-  # ── Build ───────────────────────────────────────────────────────────────────
+  # ── Build ─────────────────────────────────────────────────────────────────────
 
   build:
     name: Build and push images
@@ -93,6 +94,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     strategy:
+      fail-fast: false
       matrix:
         service:
           - name: api
@@ -140,7 +142,7 @@ jobs:
         if: vars.DEPLOY_TARGET == 'azure'
         run: az acr login --name ${{ vars.ACR_NAME }}
 
-      - name: Determine registry
+      - name: Determine registry URL
         id: registry
         run: |
           if [ "${{ vars.DEPLOY_TARGET }}" = "azure" ]; then
@@ -152,16 +154,16 @@ jobs:
       - name: Build and push ${{ matrix.service.name }}
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.service.context }}
-          file: ${{ matrix.service.dockerfile }}
-          push: true
+          context:    ${{ matrix.service.context }}
+          file:       ${{ matrix.service.dockerfile }}
+          push:       true
           tags: |
             ${{ steps.registry.outputs.url }}/forgeops-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
             ${{ steps.registry.outputs.url }}/forgeops-${{ matrix.service.name }}:latest
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to:   type=gha,mode=max
 
-  # ── Deploy to AWS ECS ────────────────────────────────────────────────────────
+  # ── Deploy to AWS ECS ─────────────────────────────────────────────────────────
 
   deploy-aws:
     name: Deploy to AWS ECS
@@ -187,22 +189,22 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster "${{ vars.ECS_CLUSTER }}" \
-            --service "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --service  "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
             --force-new-deployment \
-            --region "${{ vars.AWS_REGION || 'eu-west-1' }}"
+            --region   "${{ vars.AWS_REGION || 'eu-west-1' }}"
 
       - name: Deploy Web service
         run: |
           aws ecs update-service \
             --cluster "${{ vars.ECS_CLUSTER }}" \
-            --service "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
+            --service  "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
             --force-new-deployment \
-            --region "${{ vars.AWS_REGION || 'eu-west-1' }}"
+            --region   "${{ vars.AWS_REGION || 'eu-west-1' }}"
 
-      - name: Wait for API stability
+      - name: Wait for services to stabilise
         run: |
           aws ecs wait services-stable \
-            --cluster "${{ vars.ECS_CLUSTER }}" \
+            --cluster  "${{ vars.ECS_CLUSTER }}" \
             --services \
               "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
               "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
@@ -214,7 +216,7 @@ jobs:
           curl -f "https://${{ vars.APP_DOMAIN }}/health" || exit 1
           echo "Smoke test passed."
 
-  # ── Deploy to Azure Container Apps ──────────────────────────────────────────
+  # ── Deploy to Azure Container Apps ───────────────────────────────────────────
 
   deploy-azure:
     name: Deploy to Azure Container Apps
@@ -237,21 +239,21 @@ jobs:
       - name: Update API Container App
         run: |
           az containerapp update \
-            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
-            --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
-            --image "${{ vars.ACR_LOGIN_SERVER }}/forgeops-api:${{ env.IMAGE_TAG }}"
+            --name             "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --resource-group   "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
+            --image            "${{ vars.ACR_LOGIN_SERVER }}/forgeops-api:${{ env.IMAGE_TAG }}"
 
       - name: Update Web Container App
         run: |
           az containerapp update \
-            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
-            --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
-            --image "${{ vars.ACR_LOGIN_SERVER }}/forgeops-web:${{ env.IMAGE_TAG }}"
+            --name             "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
+            --resource-group   "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
+            --image            "${{ vars.ACR_LOGIN_SERVER }}/forgeops-web:${{ env.IMAGE_TAG }}"
 
       - name: Smoke test
         run: |
           API_URL=$(az containerapp show \
-            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --name           "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
             --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
             --query "properties.latestRevisionFqdn" -o tsv)
           sleep 20
