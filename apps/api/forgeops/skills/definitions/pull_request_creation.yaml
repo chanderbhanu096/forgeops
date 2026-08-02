@@ -1,0 +1,33 @@
+name: pull_request_creation
+version: 1.0.0
+
+description: >
+  Create a pull request from a generated patch. Creates a branch,
+  applies the diff, writes a structured PR description with evidence
+  and test results, and sets appropriate reviewers.
+
+required_tools:
+  - github.create_branch
+  - github.apply_patch
+  - github.create_pull_request
+  - github.add_reviewers
+
+permissions:
+  filesystem: none
+  database: none
+  network: restricted
+
+inputs:
+  repository_url: string
+  base_branch: string
+  patch: string
+  title: string
+  description: string
+  evidence: object
+
+outputs:
+  pull_request_url: string
+  pull_request_number: int
+  branch_name: string
+
+dependencies: []

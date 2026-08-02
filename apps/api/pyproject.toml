@@ -1,0 +1,81 @@
+[tool.poetry]
+name = "forgeops-api"
+version = "0.1.0"
+description = "ForgeOps AI — autonomous agent runtime and API"
+authors = ["ForgeOps Team"]
+packages = [{ include = "forgeops" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+# Web framework
+fastapi = "^0.115"
+uvicorn = { version = "^0.32", extras = ["standard"] }
+python-multipart = "^0.0.19"
+
+# Database
+sqlalchemy = { version = "^2.0", extras = ["asyncio"] }
+asyncpg = "^0.30"
+alembic = "^1.14"
+pgvector = "^0.3"
+
+# Cache / pub-sub
+redis = { version = "^5.2", extras = ["hiredis"] }
+
+# AI / LLM
+openai = "^1.58"
+anthropic = "^0.40"
+tiktoken = "^0.8"
+
+# Agent / tools
+pydantic = "^2.10"
+pydantic-settings = "^2.7"
+httpx = "^0.28"
+anyio = "^4.7"
+
+# Retrieval
+rank-bm25 = "^0.2"
+
+# Observability
+opentelemetry-sdk = "^1.29"
+opentelemetry-instrumentation-fastapi = "^0.50b0"
+langfuse = { version = "^2.57", optional = true }
+
+# Utilities
+python-dotenv = "^1.0"
+structlog = "^24.4"
+tenacity = "^9.0"
+pyyaml = "^6.0"
+
+[tool.poetry.extras]
+langfuse = ["langfuse"]
+
+[tool.poetry.dev-dependencies]
+pytest = "^8.3"
+pytest-asyncio = "^0.24"
+pytest-cov = "^6.0"
+ruff = "^0.8"
+mypy = "^1.13"
+httpx = "^0.28"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "ANN", "B", "SIM"]
+ignore = ["ANN101", "ANN102"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+testpaths = ["tests"]

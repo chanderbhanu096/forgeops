@@ -1,0 +1,29 @@
+name: security_review
+version: 1.0.0
+
+description: >
+  Review generated code or infrastructure changes for security issues.
+  Checks for injection vulnerabilities, secret leakage, unsafe
+  permissions, dependency risks and cloud misconfigurations.
+
+required_tools:
+  - verification.semgrep
+  - verification.checkov
+
+permissions:
+  filesystem: read_only
+  database: none
+  network: none
+
+inputs:
+  patch: string
+  changed_files: list[string]
+  target_environment: string
+
+outputs:
+  findings: list[object]
+  passed: bool
+  critical_count: int
+  high_count: int
+
+dependencies: []

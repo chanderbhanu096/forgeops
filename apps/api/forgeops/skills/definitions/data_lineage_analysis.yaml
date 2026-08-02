@@ -1,0 +1,29 @@
+name: data_lineage_analysis
+version: 1.0.0
+
+description: >
+  Trace data lineage upstream and downstream from a given node.
+  Identifies all affected tables, models and dashboards.
+  Produces an impact graph showing the blast radius of a change.
+
+required_tools:
+  - data_platform.get_lineage
+  - data_platform.run_read_only_sql
+
+permissions:
+  filesystem: none
+  database: read_only
+  network: restricted
+
+inputs:
+  start_node: string
+  direction: string   # upstream | downstream | both
+  max_depth: int
+
+outputs:
+  affected_nodes: list[string]
+  impact_graph: object
+  affected_dashboards: list[string]
+  affected_ml_features: list[string]
+
+dependencies: []

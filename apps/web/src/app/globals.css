@@ -1,0 +1,223 @@
+/* ForgeOps Mission Control — Global Styles */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #ffffff;
+  --surface: #f7f8fa;
+  --border: #e5e7eb;
+  --text: #1f2328;
+  --muted: #57606a;
+  --accent: #3b82d4;
+  --accent-bg: #eff6ff;
+  --accent-border: #bfdbfe;
+  --purple: #7c5cd8;
+  --green: #16a34a;
+  --red: #dc2626;
+  --orange: #d97706;
+  --font: -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.header {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: sticky; top: 0; z-index: 10;
+}
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.logo { text-decoration: none; font-size: 16px; font-weight: 700; }
+.logo-forge { color: var(--accent); }
+.logo-ops   { color: var(--text); }
+
+.nav { display: flex; gap: 20px; }
+.nav-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+.nav-link:hover { color: var(--text); }
+
+.main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 16px 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+p  { margin-bottom: 10px; color: var(--text); }
+
+/* ── Cards & surfaces ────────────────────────────────────────────────────── */
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 13px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+}
+.btn:hover { background: var(--surface); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #2563eb; }
+.btn-danger  { background: var(--red);    color: #fff; border-color: var(--red); }
+.btn-danger:hover { background: #b91c1c; }
+.btn-success { background: var(--green);  color: #fff; border-color: var(--green); }
+.btn-success:hover { background: #15803d; }
+
+/* ── Status badges ───────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+}
+.badge-running    { background: #fef9c3; border-color: #fde047; color: #854d0e; }
+.badge-completed  { background: #dcfce7; border-color: #86efac; color: #166534; }
+.badge-failed     { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.badge-pending    { background: var(--surface); color: var(--muted); }
+.badge-approval   { background: var(--accent-bg); border-color: var(--accent-border); color: #1e40af; }
+.badge-paused     { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+
+table  { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; }
+th     { font-weight: 600; color: var(--muted); background: var(--surface); }
+tr:hover td { background: var(--surface); }
+
+/* ── Execution graph ─────────────────────────────────────────────────────── */
+
+.exec-graph { display: flex; flex-direction: column; gap: 0; }
+.exec-node  {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.exec-node:last-child { border-bottom: none; }
+.exec-indicator {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--border); background: var(--surface);
+}
+.exec-indicator.done    { background: var(--green);  border-color: var(--green); }
+.exec-indicator.active  { background: var(--accent); border-color: var(--accent); }
+.exec-indicator.pending { background: var(--surface); border-color: var(--border); }
+.exec-indicator.failed  { background: var(--red);    border-color: var(--red); }
+
+.exec-label { font-size: 13px; color: var(--text); }
+.exec-label.active { font-weight: 700; }
+.exec-label.muted  { color: var(--muted); }
+
+/* ── Diff viewer ─────────────────────────────────────────────────────────── */
+
+.diff {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 400px;
+  background: var(--surface);
+}
+.diff-line { padding: 1px 12px; }
+.diff-line.add { background: #dcfce7; color: #166534; }
+.diff-line.del { background: #fee2e2; color: #991b1b; }
+.diff-line.meta{ background: var(--accent-bg); color: var(--muted); }
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+
+.form-group { margin-bottom: 18px; }
+label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+input[type="text"], textarea, select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+}
+textarea { resize: vertical; min-height: 100px; }
+
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+
+.progress-bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); transition: width .3s; }
+
+/* ── Misc ────────────────────────────────────────────────────────────────── */
+
+.page-header { margin-bottom: 28px; }
+.page-header p { color: var(--muted); }
+
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.two-col { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+.mono { font-family: var(--mono); font-size: 12px; }
+.muted { color: var(--muted); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

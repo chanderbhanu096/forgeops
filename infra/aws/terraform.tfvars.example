@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and fill in your values. Never commit terraform.tfvars.
+
+aws_region          = "eu-west-1"
+environment         = "staging"
+domain              = "forgeops.example.com"
+acm_certificate_arn = "arn:aws:acm:eu-west-1:ACCOUNT_ID:certificate/CERT_ID"
+db_password         = "CHANGE_ME_use_openssl_rand_base64_24"
+openai_api_key      = "sk-..."
+anthropic_api_key   = ""
+mcp_secret          = "CHANGE_ME_use_openssl_rand_hex_32"
+github_token        = "ghp_..."
+langfuse_public_key = ""
+langfuse_secret_key = ""

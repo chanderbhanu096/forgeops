@@ -1,0 +1,29 @@
+name: log_investigation
+version: 1.0.0
+
+description: >
+  Investigate pipeline failure logs. Fetches recent log batches,
+  identifies error patterns, correlates timestamps with deployments
+  and summarises root cause candidates with supporting evidence.
+
+required_tools:
+  - data_platform.fetch_logs
+  - data_platform.list_pipeline_runs
+
+permissions:
+  filesystem: none
+  database: read_only
+  network: restricted
+
+inputs:
+  pipeline_id: string
+  start_time: string
+  end_time: string
+
+outputs:
+  error_patterns: list[string]
+  root_cause_candidates: list[string]
+  affected_runs: list[string]
+  confidence: float
+
+dependencies: []

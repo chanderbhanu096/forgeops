@@ -1,0 +1,31 @@
+name: dbt_model_repair
+version: 1.0.0
+
+description: >
+  Diagnose and repair failing dbt models. Reads model source,
+  compiles to inspect the generated SQL, runs dbt test to identify
+  failures, patches the model and validates the fix.
+
+required_tools:
+  - repository.read
+  - repository.patch
+  - dbt.compile
+  - dbt.test
+
+permissions:
+  filesystem: sandbox_only
+  database: read_only
+  network: restricted
+
+inputs:
+  repository_path: string
+  failing_model: string
+  error_context: string
+
+outputs:
+  root_cause: string
+  changed_files: list[string]
+  test_results: object
+  confidence: float
+
+dependencies: []
