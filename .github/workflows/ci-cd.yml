@@ -60,11 +60,13 @@ jobs:
 
       - name: Install Python dependencies
         working-directory: apps/api
-        run: pip install -e ".[dev]" 2>/dev/null || pip install -r requirements-dev.txt 2>/dev/null || pip install poetry && poetry install
+        run: |
+          pip install poetry
+          poetry install
 
       - name: Ruff lint
         working-directory: apps/api
-        run: python -m ruff check forgeops/ || true   # non-blocking in CI for now
+        run: poetry run ruff check forgeops/ || true   # non-blocking in CI for now
 
       - name: Run tests
         working-directory: apps/api
@@ -74,7 +76,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-test' }}
           ENVIRONMENT: development
         run: |
-          python -m pytest tests/ -v --tb=short --cov=forgeops --cov-report=xml
+          poetry run pytest tests/ -v --tb=short --cov=forgeops --cov-report=xml
 
       - name: Upload coverage
         if: always()
