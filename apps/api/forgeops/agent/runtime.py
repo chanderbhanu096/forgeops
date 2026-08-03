@@ -42,8 +42,6 @@ from forgeops.models.orm import AgentState, Mission, MissionStatus, StateTransit
 log = structlog.get_logger(__name__)
 
 # ── Valid transitions ─────────────────────────────────────────────────────────
-# Maps each state to its allowed successor states.
-# Any transition not in this map is rejected at the gate.
 
 TRANSITIONS: dict[AgentState | None, list[AgentState]] = {
     None: [AgentState.mission_received],
@@ -60,19 +58,19 @@ TRANSITIONS: dict[AgentState | None, list[AgentState]] = {
     ],
     AgentState.hypothesis_verification: [
         AgentState.solution_generation,
-        AgentState.evidence_collection,  # loop back to gather more evidence
+        AgentState.evidence_collection,
         AgentState.failed,
     ],
     AgentState.solution_generation: [AgentState.sandbox_execution, AgentState.failed],
     AgentState.sandbox_execution: [AgentState.test_and_review, AgentState.failed],
     AgentState.test_and_review: [
         AgentState.human_approval,
-        AgentState.solution_generation,  # loop back and revise
+        AgentState.solution_generation,
         AgentState.failed,
     ],
     AgentState.human_approval: [
         AgentState.execution,
-        AgentState.failed,  # rejected by human
+        AgentState.failed,
     ],
     AgentState.execution: [AgentState.post_action_monitoring, AgentState.failed],
     AgentState.post_action_monitoring: [AgentState.completed, AgentState.failed],
@@ -80,7 +78,6 @@ TRANSITIONS: dict[AgentState | None, list[AgentState]] = {
     AgentState.failed: [],
 }
 
-# Maps each state to its handler coroutine
 HANDLERS = {
     AgentState.environment_discovery: handle_environment_discovery,
     AgentState.plan_generation: handle_plan_generation,
@@ -103,19 +100,8 @@ class InvalidTransitionError(RuntimeError):
     """Raised when a handler attempts an illegal state transition."""
 
 
-# ── Runtime ───────────────────────────────────────────────────────────────────
-
-
 class AgentRuntime:
-    """
-    Executes a single mission as a durable state machine.
-
-    Usage::
-        runtime = AgentRuntime(db, mission_id)
-        async for event in runtime.run():
-            # stream SSE events to the UI
-            yield event
-    """
+    """Execute one mission as a durable state machine."""
 
     def __init__(self, db: AsyncSession, mission_id: uuid.UUID) -> None:
         self._db = db
@@ -123,25 +109,20 @@ class AgentRuntime:
         self._settings = get_settings()
         self._log = log.bind(mission_id=str(mission_id))
 
-    # ── Public entry point ────────────────────────────────────────────────────
-
     async def run(self) -> AsyncGenerator[dict[str, Any], None]:
-        """
-        Drive the state machine until completion, failure, or a budget limit.
-        Yields progress events suitable for SSE streaming to the UI.
-        """
+        """Drive the state machine until completion, failure, or a budget limit."""
         mission = await self._load_mission()
         ctx = await MissionContext.from_mission(mission)
         start_time = time.monotonic()
 
-        # Transition into the first state if fresh
+        if self._settings.demo_mode:
+            self._log.info("demo_mode_enabled")
+
         if mission.current_state is None:
             await self._transition(mission, AgentState.mission_received, ctx)
             yield self._event("state_changed", {"state": AgentState.mission_received})
 
-        # Main loop
         while mission.current_state not in (AgentState.completed, AgentState.failed):
-            # ── Budget checks ──────────────────────────────────────────────
             elapsed = time.monotonic() - start_time
             if mission.steps_used >= mission.max_steps:
                 raise BudgetExceededError(
@@ -156,49 +137,62 @@ class AgentRuntime:
                     f"Time budget exhausted ({mission.max_duration_seconds}s)"
                 )
 
-            # ── Pause check ────────────────────────────────────────────────
             fresh = await self._load_mission()
             if fresh.status == MissionStatus.paused:
                 self._log.info("mission_paused", state=str(mission.current_state))
                 yield self._event("paused", {"state": str(mission.current_state)})
                 return
 
-            # ── Human approval gate ────────────────────────────────────────
             if (
                 mission.current_state == AgentState.human_approval
                 and fresh.status != MissionStatus.approved
             ):
-                self._log.info("awaiting_human_approval")
-                yield self._event("awaiting_approval", {})
-                return  # runtime resumes when approval webhook fires
+                if self._settings.demo_mode:
+                    await self._db.execute(
+                        update(Mission)
+                        .where(Mission.id == mission.id)
+                        .values(status=MissionStatus.approved)
+                    )
+                    await self._db.commit()
+                    fresh.status = MissionStatus.approved
+                    mission.status = MissionStatus.approved
+                    self._log.info("demo_approval_granted")
+                else:
+                    self._log.info("awaiting_human_approval")
+                    yield self._event("awaiting_approval", {})
+                    return
 
-            # ── Determine next state ───────────────────────────────────────
             next_state = self._next_runnable_state(mission.current_state)
             if next_state is None:
                 break
 
-            # ── Run the handler ────────────────────────────────────────────
             self._log.info("state_starting", state=next_state)
             yield self._event("state_starting", {"state": next_state})
 
             try:
-                handler = HANDLERS.get(next_state)
-                if handler is not None:
-                    result = await asyncio.wait_for(
-                        handler(ctx, self._db),
-                        timeout=self._settings.default_max_duration_seconds,
-                    )
-                    ctx.update(result)
+                if self._settings.demo_mode:
+                    # Simulate visible progress without calling paid models or MCP tools.
+                    await asyncio.sleep(0.6)
+                else:
+                    handler = HANDLERS.get(next_state)
+                    if handler is not None:
+                        result = await asyncio.wait_for(
+                            handler(ctx, self._db),
+                            timeout=self._settings.default_max_duration_seconds,
+                        )
+                        ctx.update(result)
 
                 await self._transition(mission, next_state, ctx)
-
-                # Persist step count and cost
                 await self._record_step(mission, ctx.last_cost_usd)
-                yield self._event("state_changed", {
-                    "state": next_state,
-                    "steps_used": mission.steps_used,
-                    "cost_usd": mission.cost_usd_used,
-                })
+                yield self._event(
+                    "state_changed",
+                    {
+                        "state": next_state,
+                        "steps_used": mission.steps_used,
+                        "cost_usd": mission.cost_usd_used,
+                        "demo_mode": self._settings.demo_mode,
+                    },
+                )
 
             except TimeoutError:
                 await self._fail(mission, ctx, f"Handler timed out in state {next_state}")
@@ -216,10 +210,8 @@ class AgentRuntime:
             {"state": str(mission.current_state)},
         )
 
-    # ── Checkpoint / resume ───────────────────────────────────────────────────
-
     async def resume_after_approval(self) -> AsyncGenerator[dict[str, Any], None]:
-        """Called by the approval webhook. Resumes execution from EXECUTION."""
+        """Resume execution after approval."""
         mission = await self._load_mission()
         if mission.current_state != AgentState.human_approval:
             return
@@ -228,14 +220,11 @@ class AgentRuntime:
         async for event in self.run():
             yield event
 
-    # ── State machine helpers ─────────────────────────────────────────────────
-
     def _next_runnable_state(self, current: AgentState | None) -> AgentState | None:
-        """Return the primary (first non-terminal) successor state."""
         successors = TRANSITIONS.get(current, [])
-        for s in successors:
-            if s not in (AgentState.failed,):
-                return s
+        for successor in successors:
+            if successor != AgentState.failed:
+                return successor
         return None
 
     async def _transition(
@@ -245,7 +234,6 @@ class AgentRuntime:
         ctx: MissionContext,
         trigger: str | None = None,
     ) -> None:
-        """Validate and persist a state transition atomically."""
         allowed = TRANSITIONS.get(mission.current_state, [])
         if to_state not in allowed:
             raise InvalidTransitionError(
@@ -272,6 +260,7 @@ class AgentRuntime:
         )
         await self._db.commit()
         mission.current_state = to_state
+        mission.status = self._state_to_status(to_state)
 
         self._log.info(
             "state_transition",
@@ -279,9 +268,9 @@ class AgentRuntime:
             to_state=to_state,
         )
 
-        # OTEL trace
         try:
             from forgeops.observability import trace_state_transition
+
             trace_state_transition(
                 mission_id=str(mission.id),
                 from_state=str(transition.from_state),
@@ -305,6 +294,7 @@ class AgentRuntime:
         )
         await self._db.commit()
         mission.current_state = AgentState.failed
+        mission.status = MissionStatus.failed
 
     async def _record_step(self, mission: Mission, cost_usd: float) -> None:
         await self._db.execute(
@@ -319,8 +309,6 @@ class AgentRuntime:
         mission.steps_used += 1
         mission.cost_usd_used += cost_usd
 
-    # ── Load ──────────────────────────────────────────────────────────────────
-
     async def _load_mission(self) -> Mission:
         result = await self._db.execute(
             select(Mission).where(Mission.id == self._mission_id)
@@ -329,8 +317,6 @@ class AgentRuntime:
         if mission is None:
             raise ValueError(f"Mission {self._mission_id} not found")
         return mission
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def _state_to_status(state: AgentState) -> MissionStatus:
