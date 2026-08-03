@@ -1,25 +1,9 @@
 /**
  * Mission detail page — command-centre layout with aligned vertical divider.
- *
- * Layout matches the brief's ASCII wireframe:
- *
- *   ┌─────────────────────────────────────────────────────────┐
- *   │ Mission title                    status  progress bar   │
- *   ├──────────────────────────┬──────────────────────────────┤
- *   │  Execution graph         │  Current activity            │
- *   │  (left column)           │  (right column)              │
- *   ├──────────────────────────┴──────────────────────────────┤
- *   │  Budgets / error / PR / review summary / diff           │
- *   └─────────────────────────────────────────────────────────┘
- *
- * The vertical bar between the two columns is a real CSS border on the
- * right edge of the left column — not a grid gap — so it stretches the
- * full height of the panel regardless of content length.
  */
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { use } from "react";
 import { getMission, pauseMission, resumeMission } from "@/lib/api";
 import { ExecutionGraph } from "@/components/ExecutionGraph";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -34,9 +18,9 @@ const PANEL_STATES = STATE_ORDER;
 export default function MissionDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = use(params);
+  const { id } = params;
   const [mission, setMission] = useState<Mission | null>(null);
   const [loading, setLoading] = useState(true);
   const [activity, setActivity] = useState<string>("Initialising…");
@@ -48,15 +32,28 @@ export default function MissionDetailPage({
   const startRef = useRef<number>(Date.now());
   const [elapsed, setElapsed] = useState(0);
 
-  const refresh = useCallback(() => {
-    getMission(id)
-      .then(setMission)
-      .catch(() => setError("Failed to load mission"));
+  const refresh = useCallback(async () => {
+    try {
+      setError(null);
+      const loadedMission = await getMission(id);
+      setMission(loadedMission);
+      if (loadedMission.status === "failed") {
+        setActivity("Mission failed");
+      } else if (loadedMission.status === "completed") {
+        setActivity("Mission completed");
+      } else if (loadedMission.status === "awaiting_approval") {
+        setActivity("Waiting for approval");
+      }
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : "Unknown error";
+      setError(`Failed to load mission: ${message}`);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
   useEffect(() => {
-    refresh();
-    setLoading(false);
+    void refresh();
   }, [refresh]);
 
   // Tick elapsed timer every second while running
@@ -71,11 +68,11 @@ export default function MissionDetailPage({
       setActivity(`Running: ${String(event.data.state).replace(/_/g, " ")}`);
     }
     if (event.type === "state_starting" && event.data.state === "test_and_review") {
-      // Reset test counters when test phase starts
-      setTestsPassed(null); setTestsFailed(null);
-      setTestsRunning(null); setTestsTotal(null);
+      setTestsPassed(null);
+      setTestsFailed(null);
+      setTestsRunning(null);
+      setTestsTotal(null);
     }
-    // The API can emit a progress sub-event with test counts
     if (event.type === "state_starting" && event.data.tests_total != null) {
       setTestsTotal(Number(event.data.tests_total));
       setTestsPassed(Number(event.data.tests_passed ?? 0));
@@ -88,28 +85,32 @@ export default function MissionDetailPage({
       event.type === "failed" ||
       event.type === "awaiting_approval"
     ) {
-      refresh();
+      void refresh();
     }
   });
 
   async function handlePause() {
     if (!mission) return;
     await pauseMission(mission.id);
-    refresh();
+    await refresh();
   }
 
   async function handleResume() {
     if (!mission) return;
     await resumeMission(mission.id);
-    refresh();
+    await refresh();
   }
 
-  if (loading || !mission) {
+  if (loading) {
     return <p className="muted">Loading…</p>;
   }
 
   if (error) {
     return <p style={{ color: "var(--red)" }}>{error}</p>;
+  }
+
+  if (!mission) {
+    return <p style={{ color: "var(--red)" }}>Mission not found.</p>;
   }
 
   const checkpoint = (mission as unknown as { checkpoint?: Record<string, unknown> }).checkpoint;
@@ -134,16 +135,13 @@ export default function MissionDetailPage({
 
   return (
     <>
-      {/* ── Page header ───────────────────────────────────────────────── */}
       <div className="page-header">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <h1>{mission.title}</h1>
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 6 }}>
               <StatusBadge status={mission.status} />
-              {isActive && (
-                <span className="muted" style={{ fontSize: 12 }}>{activity}</span>
-              )}
+              <span className="muted" style={{ fontSize: 12 }}>{activity}</span>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -166,7 +164,6 @@ export default function MissionDetailPage({
           </div>
         </div>
 
-        {/* Progress bar — always visible while running */}
         {isActive && (
           <div style={{ marginTop: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>
@@ -184,15 +181,7 @@ export default function MissionDetailPage({
         )}
       </div>
 
-      {/* ── Command-centre panel ──────────────────────────────────────── */}
-      {/*
-        One outer bordered box. The left column has border-right which acts
-        as the vertical divider — it stretches the full height of the row
-        regardless of which side is taller, because both cells are in the
-        same CSS grid with align-items: stretch (the default).
-      */}
       <div className="cmd-panel">
-        {/* Left — execution graph */}
         <div className="cmd-left">
           <div className="cmd-col-title">Execution graph</div>
           <ExecutionGraph
@@ -201,13 +190,11 @@ export default function MissionDetailPage({
           />
         </div>
 
-        {/* Right — current activity */}
         <div className="cmd-right">
           <div className="cmd-col-title">Current activity</div>
 
           <div className="cmd-activity-label">{activity}</div>
 
-          {/* Test progress — only shown during test_and_review phase */}
           {testsTotal != null && (
             <div className="cmd-tests">
               <div className="cmd-test-row pass">
@@ -225,7 +212,6 @@ export default function MissionDetailPage({
             </div>
           )}
 
-          {/* Stats row */}
           <div className="cmd-stats">
             <div className="cmd-stat">
               <span className="cmd-stat-label">Cost so far</span>
@@ -243,7 +229,6 @@ export default function MissionDetailPage({
             )}
           </div>
 
-          {/* Budget meters inside the right panel */}
           <div style={{ marginTop: 20 }}>
             <BudgetMeter
               stepsUsed={mission.steps_used}
@@ -255,17 +240,18 @@ export default function MissionDetailPage({
         </div>
       </div>
 
-      {/* ── Below-the-fold cards ──────────────────────────────────────── */}
       <div style={{ marginTop: 16 }}>
         <div className="card">
           <div className="card-title">Mission brief</div>
           <p style={{ color: "var(--text)", marginBottom: 0 }}>{mission.description}</p>
         </div>
 
-        {mission.status === "failed" && mission.error && (
+        {mission.status === "failed" && (
           <div className="card" style={{ borderColor: "var(--red)" }}>
             <div className="card-title" style={{ color: "var(--red)" }}>Error</div>
-            <pre className="mono" style={{ whiteSpace: "pre-wrap" }}>{mission.error}</pre>
+            <pre className="mono" style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
+              {mission.error || "The mission failed before the runtime returned an error message."}
+            </pre>
           </div>
         )}
 
