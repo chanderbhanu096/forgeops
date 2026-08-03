@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     environment: Environment = Environment.development
     log_level: str = "INFO"
     sql_echo: bool = Field(default=False, alias="SQL_ECHO")
+    demo_mode: bool = Field(default=False, alias="DEMO_MODE")
 
     # ── Database ──────────────────────────────────────────────────────────────
     database_url: str = Field(
