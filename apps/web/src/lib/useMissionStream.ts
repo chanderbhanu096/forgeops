@@ -6,7 +6,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { SSEEvent } from "@/types";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API = "/api/backend";
 
 export function useMissionStream(
   missionId: string | null,
