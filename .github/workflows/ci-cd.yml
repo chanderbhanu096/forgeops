@@ -239,7 +239,8 @@ jobs:
           az containerapp update \
             --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
             --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
-            --image "${{ vars.ACR_LOGIN_SERVER }}/forgeops-api:${{ env.IMAGE_TAG }}"
+            --image "${{ vars.ACR_LOGIN_SERVER }}/forgeops-api:${{ env.IMAGE_TAG }}" \
+            --set-env-vars "DEMO_MODE=true"
 
       - name: Update Web Container App
         run: |
