@@ -22,15 +22,9 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  # ── Test ──────────────────────────────────────────────────────────────────────
-
   test:
     name: Lint + typecheck + tests
     runs-on: ubuntu-latest
-
-    # Tests use SQLite in-memory — no postgres/redis service containers needed.
-    # The DATABASE_URL and REDIS_URL below are set to satisfy Settings validation
-    # but the test conftest overrides the engine with SQLite before any I/O runs.
 
     steps:
       - uses: actions/checkout@v4
@@ -67,7 +61,6 @@ jobs:
       - name: Run tests
         working-directory: apps/api
         env:
-          # Dummy values — conftest replaces the DB engine with SQLite in-memory
           DATABASE_URL: "postgresql+asyncpg://forgeops:test@localhost:5432/forgeops_test"
           REDIS_URL: "redis://localhost:6379"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-test-placeholder' }}
@@ -84,18 +77,6 @@ jobs:
           files: apps/api/coverage.xml
           flags: backend
         continue-on-error: true
-
-  # ── Build ─────────────────────────────────────────────────────────────────────
-  # Only runs when registry credentials are configured.
-  #
-  # How to enable:
-  #   1. Go to repo Settings → Variables → Actions
-  #   2. Add a repository variable:  REGISTRY_CONFIGURED = true
-  #   3. Add the matching secrets (AWS_ACCESS_KEY_ID / AZURE_CREDENTIALS, etc.)
-  #
-  # GitHub Actions does NOT allow secrets to be compared in job-level `if:`
-  # conditions — only repository variables (vars.*) work there.
-  # Without REGISTRY_CONFIGURED the build job is cleanly skipped.
 
   build:
     name: Build and push images
@@ -136,9 +117,9 @@ jobs:
         if: vars.DEPLOY_TARGET == 'aws' || vars.DEPLOY_TARGET == ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ vars.AWS_REGION || 'eu-west-1' }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-west-1' }}
 
       - name: Log in to ECR
         if: vars.DEPLOY_TARGET == 'aws' || vars.DEPLOY_TARGET == ''
@@ -167,16 +148,17 @@ jobs:
       - name: Build and push ${{ matrix.service.name }}
         uses: docker/build-push-action@v5
         with:
-          context:    ${{ matrix.service.context }}
-          file:       ${{ matrix.service.dockerfile }}
-          push:       true
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://forgeops-staging-api.greenrock-70958585.northeurope.azurecontainerapps.io' }}
+            NEXT_PUBLIC_WS_URL=${{ vars.NEXT_PUBLIC_WS_URL || 'wss://forgeops-staging-api.greenrock-70958585.northeurope.azurecontainerapps.io' }}
           tags: |
             ${{ steps.registry.outputs.url }}/forgeops-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
             ${{ steps.registry.outputs.url }}/forgeops-${{ matrix.service.name }}:latest
           cache-from: type=gha
-          cache-to:   type=gha,mode=max
-
-  # ── Deploy to AWS ECS ─────────────────────────────────────────────────────────
+          cache-to: type=gha,mode=max
 
   deploy-aws:
     name: Deploy to AWS ECS
@@ -194,30 +176,30 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ vars.AWS_REGION || 'eu-west-1' }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-west-1' }}
 
       - name: Deploy API service
         run: |
           aws ecs update-service \
             --cluster "${{ vars.ECS_CLUSTER }}" \
-            --service  "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --service "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
             --force-new-deployment \
-            --region   "${{ vars.AWS_REGION || 'eu-west-1' }}"
+            --region "${{ vars.AWS_REGION || 'eu-west-1' }}"
 
       - name: Deploy Web service
         run: |
           aws ecs update-service \
             --cluster "${{ vars.ECS_CLUSTER }}" \
-            --service  "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
+            --service "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
             --force-new-deployment \
-            --region   "${{ vars.AWS_REGION || 'eu-west-1' }}"
+            --region "${{ vars.AWS_REGION || 'eu-west-1' }}"
 
       - name: Wait for services to stabilise
         run: |
           aws ecs wait services-stable \
-            --cluster  "${{ vars.ECS_CLUSTER }}" \
+            --cluster "${{ vars.ECS_CLUSTER }}" \
             --services \
               "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
               "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
@@ -228,8 +210,6 @@ jobs:
           sleep 15
           curl -f "https://${{ vars.APP_DOMAIN }}/health" || exit 1
           echo "Smoke test passed."
-
-  # ── Deploy to Azure Container Apps ───────────────────────────────────────────
 
   deploy-azure:
     name: Deploy to Azure Container Apps
@@ -250,31 +230,28 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Register required Azure resource providers
-        # Microsoft.App (Container Apps) and Microsoft.OperationalInsights (Log Analytics)
-        # are not enabled by default on new subscriptions. This is idempotent — safe to
-        # re-run on every deploy; takes ~30 s if already registered, ~2 min on first run.
         run: |
-          az provider register -n Microsoft.App              --wait
+          az provider register -n Microsoft.App --wait
           az provider register -n Microsoft.OperationalInsights --wait
 
       - name: Update API Container App
         run: |
           az containerapp update \
-            --name             "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
-            --resource-group   "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
-            --image            "${{ vars.ACR_LOGIN_SERVER }}/forgeops-api:${{ env.IMAGE_TAG }}"
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
+            --image "${{ vars.ACR_LOGIN_SERVER }}/forgeops-api:${{ env.IMAGE_TAG }}"
 
       - name: Update Web Container App
         run: |
           az containerapp update \
-            --name             "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
-            --resource-group   "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
-            --image            "${{ vars.ACR_LOGIN_SERVER }}/forgeops-web:${{ env.IMAGE_TAG }}"
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
+            --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
+            --image "${{ vars.ACR_LOGIN_SERVER }}/forgeops-web:${{ env.IMAGE_TAG }}"
 
       - name: Smoke test
         run: |
           API_URL=$(az containerapp show \
-            --name           "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
             --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
             --query "properties.latestRevisionFqdn" -o tsv)
           sleep 20
