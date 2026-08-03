@@ -1,8 +1,12 @@
 /**
  * API client — typed wrappers for ForgeOps REST endpoints.
+ *
+ * Browser requests stay on the web app origin and are forwarded by the
+ * Next.js proxy route at /api/backend/[...path]. This avoids CORS and stale
+ * NEXT_PUBLIC_API_URL values embedded in old browser bundles.
  */
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API = "/api/backend";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
