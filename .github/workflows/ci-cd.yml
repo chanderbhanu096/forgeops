@@ -249,6 +249,14 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Register required Azure resource providers
+        # Microsoft.App (Container Apps) and Microsoft.OperationalInsights (Log Analytics)
+        # are not enabled by default on new subscriptions. This is idempotent — safe to
+        # re-run on every deploy; takes ~30 s if already registered, ~2 min on first run.
+        run: |
+          az provider register -n Microsoft.App              --wait
+          az provider register -n Microsoft.OperationalInsights --wait
+
       - name: Update API Container App
         run: |
           az containerapp update \
