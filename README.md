@@ -2,473 +2,502 @@
 
 # ⚙️ ForgeOps AI
 
-### A policy-controlled autonomous AI data and cloud engineer
+### An approval-controlled AI engineer for data, cloud and software operations
 
-*Not a chatbot. Not a copilot. A goal-driven AI worker operating inside a controlled engineering environment.*
+**Give it a mission. Watch it investigate. Review the evidence. Approve before execution.**
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat&logo=nextdotjs&logoColor=white)](https://nextjs.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white)](https://postgresql.org)
-[![Tests](https://img.shields.io/badge/tests-98%20passing-22c55e?style=flat)](#running-tests)
-[![License](https://img.shields.io/badge/license-MIT-6366f1?style=flat)](LICENSE)
+[![CI / CD](https://github.com/chanderbhanu096/forgeops/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/chanderbhanu096/forgeops/actions/workflows/ci-cd.yml)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://postgresql.org)
+[![License](https://img.shields.io/badge/license-MIT-6366f1)](LICENSE)
+
+[**Open the live application**](https://forgeops-staging-web.greenrock-70958585.northeurope.azurecontainerapps.io) · [Beginner setup](#run-it-locally-beginner-guide) · [Architecture](#architecture) · [Model providers](docs/MODEL_PROVIDERS.md)
 
 </div>
 
 ---
 
+## See the product before installing anything
+
+The hosted application lets a recruiter, engineer or reviewer understand the project without setting up Python, Docker or a database.
+
+[**Launch ForgeOps Mission Control →**](https://forgeops-staging-web.greenrock-70958585.northeurope.azurecontainerapps.io)
+
+> The images below are illustrated previews based on the current interface. The live application shows the working product.
+
+### 1. Create a mission and choose the model
+
+![ForgeOps Mission Control](docs/images/mission-control-preview.svg)
+
+### 2. Follow the durable execution graph
+
+![ForgeOps execution graph](docs/images/execution-preview.svg)
+
+### 3. Review the evidence and approve or reject
+
+![ForgeOps Approval Centre](docs/images/approval-centre-preview.svg)
+
+---
+
 ## What is ForgeOps?
 
-You give it a **mission**:
+ForgeOps turns an engineering goal into a controlled, auditable workflow.
 
+Example mission:
+
+```text
+Investigate why the API deployment is failing, identify the root cause,
+verify a safe fix and prepare the result for human approval.
 ```
-"The customer analytics pipeline is failing.
- Find the root cause, repair it, test the fix, and open a pull request."
+
+ForgeOps moves through a persistent state machine:
+
+```text
+MISSION RECEIVED
+      ↓
+ENVIRONMENT DISCOVERY
+      ↓
+PLAN GENERATION
+      ↓
+EVIDENCE COLLECTION
+      ↓
+HYPOTHESIS CREATION + VERIFICATION
+      ↓
+SOLUTION GENERATION
+      ↓
+SANDBOX TESTING + REVIEW
+      ↓
+HUMAN APPROVAL
+      ↓
+EXECUTION + POST-ACTION MONITORING
 ```
 
-ForgeOps then works autonomously — inspecting your repository, reading logs, querying the warehouse, writing and testing a code fix, reviewing its own changes with a security agent, and submitting a pull request. **It pauses for your approval before touching production.** If validation fails after deployment, it rolls back automatically.
+Every mission stores its state, model, cost, step count, evidence and transitions in PostgreSQL. If the process stops, the mission can be inspected and resumed instead of losing its progress.
 
-That is not a chatbot. It is an **AI operations engineer** running inside a controlled, audited environment.
+### Why it is not just another chatbot
+
+A normal chatbot mainly returns text. ForgeOps demonstrates the engineering systems required around an AI worker:
+
+- A durable state machine rather than a single prompt-response call
+- Step, time and cost budgets
+- Per-mission model selection
+- Deterministic verification before approval
+- Human-in-the-loop execution controls
+- Persistent memory and audit history
+- MCP-style tool services
+- CI/CD deployment to Azure Container Apps
+- Live progress through REST and server-sent events
 
 ---
 
-## Mission Control UI
+## What works without external credentials?
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  ForgeOps Mission Control                          ● LIVE       │
-├─────────────────────────────────────────────────────────────────┤
-│  Mission: Repair failed customer revenue pipeline               │
-│  Status: ████████████████████░░░░░  VALIDATING FIX  71%        │
-├──────────────────────────┬──────────────────────────────────────┤
-│  Execution Graph         │  Current Activity                   │
-│                          │                                      │
-│  ✓ Understand mission    │  Running dbt integration tests       │
-│  ✓ Inspect repository    │                                      │
-│  ✓ Analyse logs          │  38 / 42 tests passed               │
-│  ✓ Query warehouse       │  2  failed                          │
-│  ✓ Find root cause       │  2  still running                   │
-│  ✓ Generate fix          │                                      │
-│  ◉ Validate fix          │  Estimated cost so far: €0.17       │
-│  ○ Security review       │                                      │
-│  ○ Create PR             │  Steps: 23/50  │  Time: 4m 12s      │
-└──────────────────────────┴──────────────────────────────────────┘
-```
+ForgeOps includes a **Demo simulator**. It runs the full visible state-machine flow without calling a paid model or accessing external systems.
 
-Additional screens: live execution trace · repository diff viewer · terminal & tool-call timeline · evidence explorer · agent memory · approval centre · security findings · model cost dashboard · historical mission replay.
+This is useful for:
+
+- Exploring the interface
+- Demonstrating the approval-controlled workflow
+- Running tests
+- Understanding the architecture
+- Reviewing the project during an interview
+
+For real model-generated analysis, configure one provider such as Groq, OpenAI, Anthropic or OpenRouter.
+
+> External repositories, data platforms and production systems require their own credentials and connector configuration. ForgeOps never receives that access automatically.
 
 ---
 
-## The demo mission
+# Run it locally: beginner guide
 
-> "Yesterday's deployment caused the executive revenue dashboard to show 18% lower revenue. Investigate, identify affected datasets, produce a safe fix, and open a pull request."
+You do not need to install Python, PostgreSQL, Redis or Node.js separately. Docker starts everything for you.
 
-ForgeOps discovers:
+## What you need
 
-1. A source column changed from **euros → cents** after a schema migration.
-2. The schema remained technically valid — existing unit tests **passed**.
-3. A dbt transformation applied the old conversion factor.
-4. The error propagated through **3 downstream models**.
-5. **2 dashboards** and **1 ML feature** were affected.
+1. [Git](https://git-scm.com/downloads)
+2. [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+3. Around 6 GB of free memory for the complete local stack
 
-It then:
-- Generates a lineage impact graph
-- Finds the offending Git commit
-- Writes a regression test that would have caught it
-- Corrects the transformation
-- Runs the pipeline in a sandbox
-- Compares repaired values against historical distribution ranges
-- Produces a backfill plan
-- Opens a draft pull request
-- Waits for your approval before touching production
+Open Docker Desktop and wait until it says Docker is running.
 
----
+## Step 1 — Download the project
 
-## Seven core systems
-
-### 1 · Autonomous agent runtime
-
-A durable 13-state machine persisted to PostgreSQL. Every transition is:
-- Written atomically before the handler runs (crash-safe)
-- Appended to an immutable audit log
-- Subject to **step, cost and time budgets**
-- Resumable after crash or intentional pause
-
-```
-MISSION_RECEIVED → ENVIRONMENT_DISCOVERY → PLAN_GENERATION
-→ EVIDENCE_COLLECTION → HYPOTHESIS_CREATION → HYPOTHESIS_VERIFICATION
-→ SOLUTION_GENERATION → SANDBOX_EXECUTION → TEST_AND_REVIEW
-→ HUMAN_APPROVAL → EXECUTION → POST_ACTION_MONITORING
-```
-
-Supports: pause/resume · failure recovery · checkpointing · parallel tool execution · automatic rollback on post-deployment validation failure.
-
----
-
-### 2 · Dynamic skill system
-
-Each capability is a versioned YAML skill — not a hardcoded prompt:
-
-```yaml
-name: dbt_model_repair
-version: 1.0.0
-
-description: >
-  Diagnose and repair failing dbt models.
-
-required_tools:
-  - repository.read
-  - repository.patch
-  - dbt.compile
-  - dbt.test
-
-permissions:
-  filesystem: sandbox_only
-  database: read_only
-  network: restricted
-
-outputs:
-  root_cause: string
-  changed_files: list[string]
-  confidence: float
-```
-
-Built-in skills: `dbt_model_repair` · `log_investigation` · `data_lineage_analysis` · `pull_request_creation` · `security_review`
-
-Skills support: discovery · semver versioning · permission validation · dependency resolution · evaluation · rollback · registry.
-
----
-
-### 3 · MCP-based tool ecosystem
-
-Three custom HTTP MCP servers provide the agent's hands:
-
-| MCP Server | Tools |
-|---|---|
-| **GitHub** | read_file, create_branch, apply_patch, create_pull_request, get_ci_results |
-| **Data Platform** | inspect_pipeline_runs, fetch_logs, run_read_only_sql, get_lineage, run_data_quality_tests |
-| **Knowledge** | search_runbooks, find_incident_history, get_architecture_decisions, search_docs |
-
-All tool calls pass through an MCP gateway with auth, audit logging, permission checks and sandbox isolation.
-
----
-
-### 4 · Verifier-first execution
-
-**The model is not trusted because its answer sounds correct. It is trusted when a deterministic test proves it is correct.**
-
-Every generated output passes a multi-stage verifier before reaching the approval gate:
-
-```
-Generated patch
-     ↓
-Syntax check (ast.parse)
-     ↓
-Dangerous pattern scan (os.system, eval, hardcoded secrets)
-     ↓
-Import policy (subprocess blocked, requests flagged)
-     ↓
-Patch size gate
-     ↓
-Unit + integration tests
-     ↓
-Security scan (Semgrep / Checkov patterns)
-     ↓
-Policy validation
-     ↓
-Sandbox execution
-```
-
-SQL and Terraform go through equivalent purpose-built verifier chains.
-
----
-
-### 5 · Multi-agent review pipeline
-
-Four specialised agents with non-overlapping responsibilities:
-
-```
-Builder creates patch
-       ↓
-Reviewer requests changes (up to 3 cycles)
-       ↓
-Builder revises patch
-       ↓
-Security agent: injection, secrets, permissions, dangerous commands
-       ↓
-Verifier: deterministic test execution
-       ↓
-Judge: does the solution meet the mission's acceptance criteria?
-       ↓
-Human approval gate
-```
-
----
-
-### 6 · Agentic retrieval
-
-RAG is an internal capability — not the product. The agent decides:
-
-- **What** it needs to know
-- **Which source** should contain the answer
-- **Whether the evidence is sufficient** or whether to search again
-- Whether sources conflict, and how to resolve that
-
-Sources: repository code · git history · pipeline logs · data contracts · incident history · database schemas · lineage graphs · CI/CD results.
-
-Pipeline: query decomposition → source routing → dense + sparse retrieval → reranking → evidence verification → context compression → citation generation.
-
----
-
-### 7 · Operational memory
-
-Persisted across missions using pgvector similarity search:
-
-| Memory type | Example |
-|---|---|
-| **Episodic** | What happened in the June revenue incident |
-| **Semantic** | "This repository requires Python 3.11" |
-| **Procedural** | "For Athena partition mismatches, check Glue metadata first" |
-| **Feedback** | Human accepted root cause · human rejected patch · deployment fixed incident |
-
-The system can propose updated instructions, new skill versions or new evaluation cases — but changes require human review and evaluation pass.
-
----
-
-## Architecture overview
-
-```
-                   ┌──────────────────────────────┐
-                   │      Mission Control UI       │
-                   │  Goals · traces · diffs ·     │
-                   │  approvals · evaluations      │
-                   └─────────────┬────────────────┘
-                                 │ SSE / REST
-                   ┌─────────────▼────────────────┐
-                   │        Agent Runtime          │
-                   │  State machine · budgets ·    │
-                   │  checkpoints · recovery       │
-                   └──────┬──────────────┬─────────┘
-                          │              │
-             ┌────────────▼────┐  ┌──────▼──────────────┐
-             │ Skill Registry  │  │   Model Gateway      │
-             │ Discovery ·     │  │   OpenAI primary     │
-             │ versioning ·    │  │   Anthropic fallback │
-             │ permissions     │  │   Cost controls      │
-             └────────┬────────┘  └─────────────────────┘
-                      │
-                ┌─────▼──────────────────────────────┐
-                │           MCP Gateway               │
-                │  Auth · policies · audit · sandbox  │
-                └──┬──────────────┬──────────────┬───┘
-                   │              │               │
-             ┌─────▼──┐   ┌───────▼───┐   ┌──────▼──────┐
-             │ GitHub │   │   Data    │   │  Knowledge  │
-             │  MCP   │   │   MCP     │   │    MCP      │
-             └────────┘   └───────────┘   └─────────────┘
-
-    ┌────────────────────────────────────────────────────────┐
-    │    Verification · Security · Evaluation platform       │
-    │    Tests · policy checks · judges · tracing            │
-    └────────────────────────────────────────────────────────┘
-
-    ┌────────────────────────────────────────────────────────┐
-    │            PostgreSQL (pgvector) + Redis               │
-    │    Missions · state transitions · memory · skills      │
-    └────────────────────────────────────────────────────────┘
-```
-
----
-
-## Quick start (5 minutes)
-
-> **Full instructions** for every scenario — local, no-Docker, AWS, Azure, observability, real tool connections — are in **[SETUP.md](SETUP.md)**.
-
-### Prerequisites
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker + Compose v2)
-- An OpenAI API key — [platform.openai.com](https://platform.openai.com)
-
-### 1. Clone and configure
+Open Terminal on macOS/Linux or PowerShell on Windows:
 
 ```bash
 git clone https://github.com/chanderbhanu096/forgeops.git
 cd forgeops
-cp .env.example .env
-# Open .env — set OPENAI_API_KEY=sk-...
 ```
 
-### 2. Start
+## Step 2 — Create your private settings file
+
+### macOS or Linux
 
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
 
-Starts: PostgreSQL 16 + pgvector · Redis 7 · API server · Mission Control UI · 3 MCP servers · sandbox executor.
-First build: **~3 min**. Subsequent starts: **~15 sec**.
+### Windows PowerShell
 
-### 3. Open
+```powershell
+Copy-Item .env.example .env
+```
 
-| URL | What it is |
+The `.env` file contains local settings and API keys. It is ignored by Git and must never be committed.
+
+## Step 3 — Start in free demo mode
+
+The example configuration already defaults to:
+
+```dotenv
+DEFAULT_LLM_PROVIDER=demo
+DEFAULT_LLM_MODEL=forgeops-demo
+```
+
+Start the full stack:
+
+```bash
+docker compose up --build
+```
+
+The first build may take several minutes. Wait until the services stop printing startup errors.
+
+## Step 4 — Open ForgeOps
+
+| Address | Purpose |
 |---|---|
-| http://localhost:3000 | Mission Control UI |
-| http://localhost:8000/docs | Interactive API docs (Swagger) |
-| http://localhost:8000/metrics | Prometheus metrics |
+| http://localhost:3000 | Mission Control web application |
+| http://localhost:8000/docs | Interactive API documentation |
+| http://localhost:8000/health | API health check |
+| http://localhost:8000/metrics | Prometheus-compatible metrics |
 
-### 4. Submit your first mission
+Open **http://localhost:3000** and create a mission using the **Demo simulator** provider.
 
-Open Mission Control → **New Mission** → paste this → **Start**:
+## Step 5 — Try this first mission
 
+**Title**
+
+```text
+Analyze a simulated API deployment failure
 ```
-Investigate why the customer revenue pipeline is reporting 18% lower
-revenue after yesterday's deployment. Find the root cause and create
-a pull request with the fix.
+
+**Description**
+
+```text
+Treat this as a simulated incident. Do not access external systems and do not
+make destructive changes.
+
+Known facts:
+- The health endpoint works.
+- Mission execution previously failed because a step counter was incremented twice.
+- The defect has been fixed.
+
+Explain the likely root cause, provide a verification plan and recommend three
+regression tests. Pause before any execution that would change a system.
 ```
 
-Watch the **Execution Graph** update live. When the agent reaches **HUMAN APPROVAL**, review the diff and evidence in the Approval Centre, then click **Approve**.
+The mission should move through the execution graph and finish automatically in demo mode.
+
+## Stop ForgeOps
+
+Press `Ctrl + C` in the terminal, then run:
+
+```bash
+docker compose down
+```
+
+Your PostgreSQL and Redis data remain in Docker volumes.
+
+To remove all local ForgeOps data and start completely fresh:
+
+```bash
+docker compose down -v
+```
 
 ---
 
-## Running tests
+# Use a real AI model
+
+Only configure the provider you plan to use. Keep all API keys inside `.env` locally or a cloud secret manager in production.
+
+## Easiest option: Groq
+
+Open `.env` and change these lines:
+
+```dotenv
+GROQ_API_KEY=gsk_your_real_key_here
+DEFAULT_LLM_PROVIDER=groq
+DEFAULT_LLM_MODEL=openai/gpt-oss-20b
+```
+
+Restart:
+
+```bash
+docker compose down
+docker compose up --build
+```
+
+Open Mission Control. **Groq** should now be selectable.
+
+## Other supported providers
+
+| Provider | Secret or setting | Example model |
+|---|---|---|
+| Demo simulator | Nothing required | `forgeops-demo` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-5-mini` |
+| Anthropic / Claude | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
+| Groq | `GROQ_API_KEY` | `openai/gpt-oss-20b` |
+| OpenRouter | `OPENROUTER_API_KEY` | `openrouter/auto` |
+| Ollama | `OLLAMA_BASE_URL` | `llama3.2` |
+| Other OpenAI-compatible service | `CUSTOM_OPENAI_BASE_URL` | Provider-specific |
+
+Provider model catalogs change. The model field in ForgeOps is editable, so you can enter a model ID supported by your configured provider.
+
+Detailed configuration: **[docs/MODEL_PROVIDERS.md](docs/MODEL_PROVIDERS.md)**
+
+## Confirm that the provider is available
+
+```bash
+curl http://localhost:3000/api/backend/api/v1/models
+```
+
+Find your provider and check that it contains:
+
+```json
+"configured": true
+```
+
+---
+
+# How to use the approval workflow
+
+Real-provider missions pause at **Human Approval**.
+
+1. Open the mission details page.
+2. Click **Go to Approval Centre**.
+3. Review the summary, risk level and generated diff.
+4. Add an optional review note.
+5. Click **Approve** to continue or **Reject** to stop the mission.
+
+Approval decisions are persisted in PostgreSQL as part of the audit trail. ForgeOps resumes from the approval gate and runs the execution handler only after approval.
+
+---
+
+# Troubleshooting for beginners
+
+## The website does not open
+
+Check the running containers:
+
+```bash
+docker compose ps
+```
+
+Read the most recent logs:
+
+```bash
+docker compose logs --tail=100
+```
+
+## The UI says “Failed to fetch”
+
+Confirm the API is healthy:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+Then restart the web and API services:
+
+```bash
+docker compose restart api web
+```
+
+## My provider appears as “not configured”
+
+1. Confirm the key is in `.env`, not `.env.example`.
+2. Confirm the variable name is exact, for example `GROQ_API_KEY`.
+3. Restart the containers after editing `.env`.
+4. Run the model-catalog check shown above.
+
+## A mission waits for approval
+
+That is expected for a real provider. Open **Approval Centre** from the navigation or the mission detail page.
+
+## A port is already being used
+
+ForgeOps uses ports `3000`, `5432`, `6379`, `8000`, `8001`, `8002` and `8003`. Stop the program using the conflicting port or change the mapping in `docker-compose.yml`.
+
+## Start completely fresh
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+---
+
+# What a recruiter can evaluate in two minutes
+
+| Area | Evidence in this repository |
+|---|---|
+| AI engineering | Multi-provider gateway, structured tool calls, context management and per-mission routing |
+| Agent systems | Durable 13-state runtime with checkpoints, budgets, pause/resume and approval gates |
+| RAG and retrieval | Query routing, BM25 retrieval, reranking, compression and evidence handling |
+| Safety | Deterministic verifiers, sandboxing, risk classification and explicit approval |
+| Backend engineering | Async FastAPI, SQLAlchemy, PostgreSQL, migrations and SSE |
+| Frontend engineering | Next.js Mission Control interface with live execution progress |
+| Platform engineering | Docker Compose, GitHub Actions, Azure Container Apps and container registry |
+| Testing | Automated runtime, API, retrieval, memory, verifier and approval-workflow tests |
+| Observability | Structured logs, Prometheus metrics, OpenTelemetry and optional Langfuse |
+
+---
+
+# Architecture
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│                   Mission Control UI                       │
+│       New mission · execution graph · diff · approval      │
+└───────────────────────────┬────────────────────────────────┘
+                            │ REST + SSE
+┌───────────────────────────▼────────────────────────────────┐
+│                      FastAPI API                           │
+│       Missions · approvals · skills · memory · metrics     │
+└───────────────────────────┬────────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────────┐
+│               Durable Agent State Machine                  │
+│  checkpoints · budgets · handlers · pause/resume · audit   │
+└───────────────┬──────────────────────────────┬─────────────┘
+                │                              │
+┌───────────────▼──────────────┐  ┌────────────▼─────────────┐
+│       Model Gateway          │  │     Skill + Tool Layer    │
+│ OpenAI · Claude · Groq       │  │ GitHub · data · knowledge │
+│ OpenRouter · Ollama · custom │  │ MCP services · sandbox    │
+└──────────────────────────────┘  └──────────────────────────┘
+                │                              │
+┌───────────────▼──────────────────────────────▼─────────────┐
+│ PostgreSQL + pgvector · Redis · verification · observability│
+└────────────────────────────────────────────────────────────┘
+```
+
+## Core engineering systems
+
+### Durable runtime
+
+Every successful transition is written to the database. Missions enforce maximum steps, cost and duration. State is recoverable after a restart.
+
+### Model gateway
+
+The model provider and model are stored per mission. Concurrent missions can use different providers without sharing selection state. API keys remain server-side and are never returned to the browser.
+
+### Verification-first design
+
+Generated code, SQL and infrastructure changes pass deterministic verifier chains. Checks include syntax, dangerous patterns, imports, patch size, SQL safety and Terraform security rules.
+
+### Multi-agent review
+
+A builder, reviewer, security agent, deterministic verifier and judge perform separate roles before the human approval gate.
+
+### Retrieval and memory
+
+ForgeOps contains source routing, sparse retrieval, reranking, context compression and persistent episodic, semantic, procedural and feedback memory.
+
+### MCP-style tool services
+
+The repository includes GitHub, data-platform and knowledge services. They demonstrate the tool boundary and can be connected to real systems with appropriate credentials and implementation-specific configuration.
+
+---
+
+# Project structure
+
+```text
+forgeops/
+├── apps/
+│   ├── api/                         FastAPI agent runtime
+│   │   ├── forgeops/agent/          State machine, handlers and model gateway
+│   │   ├── forgeops/api/routes/     Mission, approval, memory and metrics APIs
+│   │   ├── forgeops/verification/   Code, SQL and infrastructure verifiers
+│   │   ├── forgeops/retrieval/      Retrieval and reranking pipeline
+│   │   ├── forgeops/memory/         Persistent operational memory
+│   │   └── tests/                   Automated backend tests
+│   └── web/                         Next.js Mission Control UI
+├── services/                        Sandbox and MCP-style tool services
+├── infra/aws/                       AWS Terraform modules
+├── infra/azure/                     Azure Terraform modules
+├── docs/                            Setup and provider documentation
+├── docker-compose.yml               Complete local stack
+└── .github/workflows/ci-cd.yml      Test, build and cloud deployment
+```
+
+---
+
+# Running the automated tests
+
+The easiest option is to run them inside the API container:
+
+```bash
+docker compose run --rm api poetry run pytest tests/ -v
+```
+
+For local Python development:
 
 ```bash
 cd apps/api
-
-# Install dependencies (one-time)
-pip install poetry
-poetry install
-
-# Run all tests
-PYTHONPATH=. pytest tests/ -v
-
-# Run a specific module
-PYTHONPATH=. pytest tests/test_agent_runtime.py -v
-
-# Run the demo integration test
-PYTHONPATH=. pytest tests/demo/ -v
+pip install poetry==1.8.3
+poetry install --with dev
+poetry run ruff check forgeops/
+poetry run pytest tests/ -v
 ```
 
-**98 tests, 0 failures.**
-
-Test coverage: agent runtime · state machine transitions · model gateway · skill registry · verification pipeline (code, SQL, terraform) · multi-agent orchestration · agentic retrieval · memory store · missions API · approvals API · Prometheus metrics · demo integration scenario.
+The CI pipeline runs linting and the backend test suite before building or deploying images.
 
 ---
 
-## Project structure
+# Deploying
 
-```
-forgeops/
-├── .env.example                      ← copy to .env, set OPENAI_API_KEY
-├── docker-compose.yml                ← one command local stack
-│
-├── apps/
-│   ├── api/                          ← FastAPI agent runtime
-│   │   └── forgeops/
-│   │       ├── agent/
-│   │       │   ├── runtime.py        ← 13-state durable state machine
-│   │       │   ├── handlers.py       ← one async handler per state
-│   │       │   ├── gateway.py        ← OpenAI + Anthropic with fallback
-│   │       │   ├── context.py        ← mission context, checkpointing
-│   │       │   └── multi_agent.py    ← Builder→Reviewer→Security→Judge
-│   │       ├── skills/
-│   │       │   ├── registry.py       ← YAML loader, semver sort
-│   │       │   └── definitions/      ← 5 built-in skill YAMLs
-│   │       ├── verification/
-│   │       │   ├── pipeline.py       ← orchestrates verifier chains
-│   │       │   ├── code_verifiers.py ← syntax, dangerous patterns, imports
-│   │       │   ├── sql_verifiers.py  ← injection, row limits, risk
-│   │       │   └── infra_verifiers.py← terraform destructive + security
-│   │       ├── retrieval/
-│   │       │   └── orchestrator.py   ← BM25, source router, reranker
-│   │       ├── memory/
-│   │       │   └── store.py          ← episodic, semantic, procedural, feedback
-│   │       ├── models/orm.py         ← SQLAlchemy ORM (cross-DB type adapters)
-│   │       ├── observability.py      ← OpenTelemetry + Langfuse
-│   │       └── api/routes/           ← missions, approvals, skills, memory, SSE
-│   │
-│   └── web/                          ← Next.js 14 Mission Control UI
-│       └── src/
-│           ├── app/                  ← mission list, detail, approvals, memory
-│           ├── components/           ← ExecutionGraph, DiffViewer, BudgetMeter
-│           └── lib/                  ← API client, SSE hook
-│
-├── services/
-│   ├── mcp-github/main.py            ← GitHub MCP server (port 8001)
-│   ├── mcp-data/main.py              ← Data platform MCP server (port 8002)
-│   └── mcp-knowledge/main.py         ← Knowledge MCP server (port 8003)
-│
-├── infra/
-│   ├── aws/                          ← Terraform: ECS Fargate + RDS + ElastiCache
-│   │   └── modules/vpc,ecr,rds,alb,ecs-service,elasticache/
-│   └── azure/                        ← Terraform: Container Apps + Postgres + Redis
-│       └── modules/acr,postgres,redis,keyvault/
-│
-└── .github/workflows/ci-cd.yml       ← test → build → deploy (AWS or Azure)
-```
+The repository includes a GitHub Actions workflow for container builds and deployment to Azure Container Apps or AWS ECS.
+
+For the Azure deployment used by the live application:
+
+1. Add cloud credentials under **GitHub → Settings → Secrets and variables → Actions**.
+2. Add model API keys as GitHub Actions secrets.
+3. Add non-sensitive deployment settings as repository variables.
+4. Push to `main`.
+5. CI tests the code, builds images, pushes them to the registry and updates the cloud applications.
+
+See [SETUP.md](SETUP.md) and [docs/MODEL_PROVIDERS.md](docs/MODEL_PROVIDERS.md) for detailed configuration.
 
 ---
 
-## Technology stack
+# Security notes
 
-| Layer | Technology |
-|---|---|
-| **API runtime** | Python 3.11, FastAPI, SQLAlchemy async, Pydantic v2 |
-| **Primary LLM** | OpenAI gpt-4o |
-| **Fallback LLM** | Anthropic claude-3-5-sonnet |
-| **State / cache** | PostgreSQL 16 + pgvector, Redis 7 |
-| **Retrieval** | BM25 sparse + dense vectors, cross-encoder reranking |
-| **MCP servers** | Custom HTTP servers — GitHub, Data, Knowledge |
-| **Verification** | ast, Ruff patterns, Semgrep/Checkov rules |
-| **Frontend** | Next.js 14, TypeScript, SSE for live updates |
-| **Observability** | OpenTelemetry, Langfuse (LLM traces), structlog |
-| **Infra — AWS** | ECS Fargate, RDS, ElastiCache, ALB, ECR, Terraform |
-| **Infra — Azure** | Container Apps, PostgreSQL Flexible Server, Redis, ACR, Terraform |
-| **CI/CD** | GitHub Actions — test → build matrix → conditional cloud deploy |
+- Never commit `.env` or API keys.
+- Provider credentials remain on the API server.
+- The frontend receives only provider availability and model suggestions.
+- Approval records contain the decision and reviewer notes, not provider credentials.
+- Demo mode does not access external systems.
+- Real external-system access should use least-privilege credentials and isolated environments.
 
 ---
 
-## Deployment
+# Current scope
 
-Full step-by-step instructions for both clouds in [DEPLOYMENT.md](DEPLOYMENT.md).
+ForgeOps is a portfolio-grade engineering platform and reference implementation. It demonstrates the architecture, runtime, UI, provider routing, verification, approval controls, tests and cloud deployment expected in a serious agentic system.
 
-**AWS (ECS Fargate)**
-```bash
-cd infra/aws
-cp terraform.tfvars.example terraform.tfvars   # fill in your values
-terraform init && terraform apply
-```
-
-**Azure (Container Apps)**
-```bash
-cd infra/azure
-cp terraform.tfvars.example terraform.tfvars
-terraform init && terraform apply
-```
+Production use would additionally require organization-specific authentication, authorization, secret management, connector hardening, evaluation datasets, operational runbooks and compliance review.
 
 ---
 
-## Environment variables
+## License
 
-| Variable | Required | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | **Yes** | Primary LLM — gpt-4o |
-| `ANTHROPIC_API_KEY` | No | Fallback LLM |
-| `DATABASE_URL` | Yes (auto in Docker) | PostgreSQL async connection string |
-| `REDIS_URL` | Yes (auto in Docker) | Redis connection string |
-| `MCP_SECRET` | Yes (auto in Docker) | Shared auth token for MCP servers |
-| `GITHUB_TOKEN` | No | GitHub API — required for PR creation |
-| `LANGFUSE_PUBLIC_KEY` | No | LLM trace observability |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | OTEL traces → Grafana Tempo etc. |
-| `ENVIRONMENT` | No | `development` / `staging` / `production` |
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## Licence
-
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE)
