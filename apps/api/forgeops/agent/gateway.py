@@ -1,9 +1,17 @@
 """
-Model Gateway — provider-independent LLM interface with cost tracking,
-fallback routing and structured tool calling.
+Provider-independent LLM gateway with mission-scoped model routing.
+
+Supported providers:
+- OpenAI
+- Anthropic
+- Groq (OpenAI-compatible)
+- OpenRouter (OpenAI-compatible)
+- Ollama (OpenAI-compatible endpoint)
+- Any custom OpenAI-compatible endpoint
 """
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
@@ -11,49 +19,36 @@ import structlog
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
+from forgeops.agent.model_selection import get_model_selection
 from forgeops.config import get_settings
 
 log = structlog.get_logger(__name__)
 
-# ── Cost table (USD per 1k tokens) ───────────────────────────────────────────
-# Update periodically. Used for budget tracking only — not invoicing.
+# Approximate prices used only for mission budget estimates. Unknown models use
+# a conservative fallback and should not be treated as provider billing data.
 _COST_PER_1K: dict[str, dict[str, float]] = {
     "gpt-4o": {"input": 0.0025, "output": 0.010},
     "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
-    "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
-    "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125},
+    "gpt-4.1-mini": {"input": 0.0004, "output": 0.0016},
+    "claude-sonnet-4-20250514": {"input": 0.003, "output": 0.015},
+    "claude-opus-4-20250514": {"input": 0.015, "output": 0.075},
 }
 
 
 def _estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
     rates = _COST_PER_1K.get(model, {"input": 0.003, "output": 0.015})
-    return (prompt_tokens / 1000) * rates["input"] + (completion_tokens / 1000) * rates["output"]
-
-
-# ── Gateway ───────────────────────────────────────────────────────────────────
+    return (prompt_tokens / 1000) * rates["input"] + (
+        completion_tokens / 1000
+    ) * rates["output"]
 
 
 class ModelGateway:
-    """
-    Wraps OpenAI and Anthropic. Tries the primary model; falls back to
-    the secondary provider on rate-limit or server errors.
-
-    All calls return a uniform ModelResponse so callers are decoupled from
-    the underlying provider.
-    """
+    """Route model calls to the provider selected for the current mission."""
 
     def __init__(self) -> None:
-        settings = get_settings()
-        self._settings = settings
-        self._openai = AsyncOpenAI(
-            api_key=settings.openai_api_key.get_secret_value()
-        )
-        _anthropic_key = settings.anthropic_api_key.get_secret_value()
-        self._anthropic: AsyncAnthropic | None = (
-            AsyncAnthropic(api_key=_anthropic_key) if _anthropic_key else None
-        )
-
-    # ── Public API ────────────────────────────────────────────────────────────
+        self._settings = get_settings()
+        self._openai_clients: dict[str, AsyncOpenAI] = {}
+        self._anthropic_client: AsyncAnthropic | None = None
 
     async def chat(
         self,
@@ -67,73 +62,141 @@ class ModelGateway:
         response_format: dict[str, Any] | None = None,
         _handler: str = "unknown",
     ) -> ModelResponse:
-        model = model or self._settings.primary_model
-        t0 = time.monotonic()
+        selection = get_model_selection()
+        provider = (
+            selection.provider
+            if selection is not None
+            else self._settings.default_llm_provider
+        ).strip().lower()
+        resolved_model = model or (
+            selection.model
+            if selection is not None
+            else self._settings.default_llm_model
+        )
 
-        try:
-            response = await self._openai_chat(
+        if provider == "demo":
+            raise RuntimeError(
+                "The demo provider does not perform model calls. "
+                "Select a configured LLM provider for real execution."
+            )
+
+        t0 = time.monotonic()
+        if provider == "anthropic":
+            response = await self._anthropic_chat(
                 messages=messages,
-                model=model,
+                model=resolved_model,
+                tools=tools,
+                tool_choice=tool_choice,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        else:
+            response = await self._openai_compatible_chat(
+                provider=provider,
+                messages=messages,
+                model=resolved_model,
                 tools=tools,
                 tool_choice=tool_choice,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 response_format=response_format,
             )
-            latency_ms = int((time.monotonic() - t0) * 1000)
-            log.debug("model_call", model=model, latency_ms=latency_ms, cost_usd=response.cost_usd)
-            self._emit_trace(response, latency_ms, _handler)
-            return response
 
-        except Exception as primary_err:
-            if self._anthropic is None:
-                raise
-
-            log.warning(
-                "primary_model_failed_fallback",
-                model=model,
-                error=str(primary_err),
-                fallback=self._settings.fallback_model,
-            )
-            response = await self._anthropic_chat(
-                messages=messages,
-                model=self._settings.fallback_model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            latency_ms = int((time.monotonic() - t0) * 1000)
-            self._emit_trace(response, latency_ms, _handler)
-            return response
-
-    def _emit_trace(self, response: ModelResponse, latency_ms: int, handler: str) -> None:
-        """Fire-and-forget Langfuse trace. Never raises."""
-        try:
-            from forgeops.observability import get_langfuse
-            get_langfuse().trace_model_call(
-                mission_id="gateway",
-                model=response.model,
-                provider=response.provider,
-                prompt_tokens=response.prompt_tokens,
-                completion_tokens=response.completion_tokens,
-                cost_usd=response.cost_usd,
-                latency_ms=latency_ms,
-                handler_name=handler,
-            )
-        except Exception:
-            pass
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        log.debug(
+            "model_call",
+            provider=provider,
+            model=resolved_model,
+            latency_ms=latency_ms,
+            cost_usd=response.cost_usd,
+        )
+        self._emit_trace(response, latency_ms, _handler)
+        return response
 
     async def fast_chat(
         self,
         messages: list[dict[str, Any]],
         **kwargs: object,
     ) -> ModelResponse:
-        """Use the fast/cheap model for classification and routing tasks."""
+        """Use the mission-selected model, including for classification tasks."""
+        selection = get_model_selection()
+        if selection is not None:
+            return await self.chat(messages, **kwargs)
         return await self.chat(messages, model=self._settings.fast_model, **kwargs)
 
-    # ── OpenAI ────────────────────────────────────────────────────────────────
+    def _get_openai_client(self, provider: str) -> AsyncOpenAI:
+        cached = self._openai_clients.get(provider)
+        if cached is not None:
+            return cached
 
-    async def _openai_chat(
+        settings = self._settings
+        base_url: str | None = None
+        api_key = ""
+        default_headers: dict[str, str] | None = None
+
+        if provider == "openai":
+            api_key = settings.openai_api_key.get_secret_value().strip()
+        elif provider == "groq":
+            api_key = settings.groq_api_key.get_secret_value().strip()
+            base_url = settings.groq_base_url
+        elif provider == "openrouter":
+            api_key = settings.openrouter_api_key.get_secret_value().strip()
+            base_url = settings.openrouter_base_url
+            default_headers = {
+                "HTTP-Referer": "https://github.com/chanderbhanu096/forgeops",
+                "X-Title": "ForgeOps AI",
+            }
+        elif provider == "ollama":
+            base_url = settings.ollama_base_url.strip()
+            api_key = "ollama"
+            if not base_url:
+                raise RuntimeError(
+                    "OLLAMA_BASE_URL is not configured for the Ollama provider."
+                )
+        elif provider == "custom":
+            base_url = settings.custom_openai_base_url.strip()
+            api_key = settings.custom_openai_api_key.get_secret_value().strip()
+            if not base_url:
+                raise RuntimeError(
+                    "CUSTOM_OPENAI_BASE_URL is not configured for the custom provider."
+                )
+            # Some local OpenAI-compatible servers do not require authentication.
+            api_key = api_key or "not-required"
+        else:
+            raise RuntimeError(f"Unsupported LLM provider: {provider}")
+
+        if not api_key:
+            env_name = {
+                "openai": "OPENAI_API_KEY",
+                "groq": "GROQ_API_KEY",
+                "openrouter": "OPENROUTER_API_KEY",
+            }.get(provider, "API key")
+            raise RuntimeError(f"{env_name} is not configured.")
+
+        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url.rstrip("/")
+        if default_headers:
+            client_kwargs["default_headers"] = default_headers
+
+        client = AsyncOpenAI(**client_kwargs)
+        self._openai_clients[provider] = client
+        return client
+
+    def _get_anthropic_client(self) -> AsyncAnthropic:
+        if self._anthropic_client is not None:
+            return self._anthropic_client
+
+        api_key = self._settings.anthropic_api_key.get_secret_value().strip()
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY is not configured.")
+
+        self._anthropic_client = AsyncAnthropic(api_key=api_key)
+        return self._anthropic_client
+
+    async def _openai_compatible_chat(
         self,
+        provider: str,
         messages: list[dict[str, Any]],
         model: str,
         tools: list[dict[str, Any]] | None,
@@ -142,6 +205,7 @@ class ModelGateway:
         max_tokens: int,
         response_format: dict[str, Any] | None,
     ) -> ModelResponse:
+        client = self._get_openai_client(provider)
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -155,7 +219,7 @@ class ModelGateway:
         if response_format:
             kwargs["response_format"] = response_format
 
-        completion = await self._openai.chat.completions.create(**kwargs)
+        completion = await client.chat.completions.create(**kwargs)
         choice = completion.choices[0]
         usage = completion.usage
 
@@ -167,37 +231,35 @@ class ModelGateway:
         if choice.message.tool_calls:
             tool_calls = [
                 {
-                    "id": tc.id,
-                    "name": tc.function.name,
-                    "arguments": tc.function.arguments,
+                    "id": call.id,
+                    "name": call.function.name,
+                    "arguments": call.function.arguments,
                 }
-                for tc in choice.message.tool_calls
+                for call in choice.message.tool_calls
             ]
 
         return ModelResponse(
             content=choice.message.content or "",
             tool_calls=tool_calls,
             model=model,
-            provider="openai",
+            provider=provider,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             cost_usd=cost,
             finish_reason=choice.finish_reason or "stop",
         )
 
-    # ── Anthropic ─────────────────────────────────────────────────────────────
-
     async def _anthropic_chat(
         self,
         messages: list[dict[str, Any]],
         model: str,
+        tools: list[dict[str, Any]] | None,
+        tool_choice: str | None,
         temperature: float,
         max_tokens: int,
     ) -> ModelResponse:
-        assert self._anthropic is not None
-
-        # Convert OpenAI message format to Anthropic format
-        system_parts = [m["content"] for m in messages if m["role"] == "system"]
+        client = self._get_anthropic_client()
+        system_parts = [str(m["content"]) for m in messages if m["role"] == "system"]
         system_text = "\n\n".join(system_parts) if system_parts else None
         anthropic_messages = [
             {"role": m["role"], "content": m["content"]}
@@ -213,17 +275,45 @@ class ModelGateway:
         }
         if system_text:
             kwargs["system"] = system_text
+        if tools:
+            kwargs["tools"] = [
+                {
+                    "name": tool["function"]["name"],
+                    "description": tool["function"].get("description", ""),
+                    "input_schema": tool["function"].get(
+                        "parameters", {"type": "object", "properties": {}}
+                    ),
+                }
+                for tool in tools
+                if tool.get("type") == "function" and "function" in tool
+            ]
+        if tool_choice:
+            if tool_choice == "required":
+                kwargs["tool_choice"] = {"type": "any"}
+            elif tool_choice == "auto":
+                kwargs["tool_choice"] = {"type": "auto"}
 
-        completion = await self._anthropic.messages.create(**kwargs)
-        content = "".join(
-            block.text for block in completion.content if hasattr(block, "text")
-        )
+        completion = await client.messages.create(**kwargs)
+        content_parts: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
+        for block in completion.content:
+            block_type = getattr(block, "type", "")
+            if block_type == "text" and hasattr(block, "text"):
+                content_parts.append(block.text)
+            elif block_type == "tool_use":
+                tool_calls.append(
+                    {
+                        "id": str(getattr(block, "id", "")),
+                        "name": str(getattr(block, "name", "")),
+                        "arguments": json.dumps(getattr(block, "input", {})),
+                    }
+                )
+
         usage = completion.usage
         cost = _estimate_cost(model, usage.input_tokens, usage.output_tokens)
-
         return ModelResponse(
-            content=content,
-            tool_calls=None,
+            content="".join(content_parts),
+            tool_calls=tool_calls or None,
             model=model,
             provider="anthropic",
             prompt_tokens=usage.input_tokens,
@@ -232,8 +322,22 @@ class ModelGateway:
             finish_reason=completion.stop_reason or "stop",
         )
 
+    def _emit_trace(self, response: ModelResponse, latency_ms: int, handler: str) -> None:
+        try:
+            from forgeops.observability import get_langfuse
 
-# ── Response DTO ──────────────────────────────────────────────────────────────
+            get_langfuse().trace_model_call(
+                mission_id="gateway",
+                model=response.model,
+                provider=response.provider,
+                prompt_tokens=response.prompt_tokens,
+                completion_tokens=response.completion_tokens,
+                cost_usd=response.cost_usd,
+                latency_ms=latency_ms,
+                handler_name=handler,
+            )
+        except Exception:
+            pass
 
 
 class ModelResponse:
