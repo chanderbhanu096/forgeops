@@ -10,7 +10,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from forgeops.api.routes import approvals, memory, metrics, missions, skills, sse
+from forgeops.api.routes import approvals, memory, metrics, missions, models, skills, sse
 from forgeops.cache import close_redis, get_redis
 from forgeops.config import get_settings
 from forgeops.db import get_engine
@@ -26,20 +26,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
 
     from forgeops.observability import setup_otel
+
     setup_otel(service_name="forgeops-api")
 
     log.info(
         "forgeops_starting",
         environment=settings.environment,
-        primary_model=settings.primary_model,
+        default_llm_provider=settings.default_llm_provider,
+        default_llm_model=settings.default_llm_model,
     )
 
-    # Warm up connections
     await get_redis()
 
     yield
 
     from forgeops.observability import get_langfuse
+
     get_langfuse().flush()
     await close_redis()
     await get_engine().dispose()
@@ -70,6 +72,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(missions.router, prefix="/api/v1/missions", tags=["missions"])
+    app.include_router(models.router, prefix="/api/v1/models", tags=["models"])
     app.include_router(approvals.router, prefix="/api/v1/approvals", tags=["approvals"])
     app.include_router(skills.router, prefix="/api/v1/skills", tags=["skills"])
     app.include_router(memory.router, prefix="/api/v1/memory", tags=["memory"])
