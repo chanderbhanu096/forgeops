@@ -18,7 +18,7 @@ from forgeops.models.orm import Mission
 class Hypothesis:
     id: str
     description: str
-    confidence: float          # 0.0 – 1.0
+    confidence: float
     evidence: list[str]
     rank: int = 0
 
@@ -42,57 +42,42 @@ class PlanStep:
 
 @dataclass
 class MissionContext:
-    # Identity
     mission_id: uuid.UUID
     title: str
     description: str
     attachments: list[dict[str, Any]] = field(default_factory=list)
 
-    # Plan
     plan: list[PlanStep] = field(default_factory=list)
     current_plan_step: int = 0
 
-    # Environment
     repository_url: str | None = None
     repository_path: str | None = None
     environment_summary: str = ""
 
-    # Evidence
     raw_evidence: list[dict[str, Any]] = field(default_factory=list)
     relevant_files: list[str] = field(default_factory=list)
     log_excerpts: list[str] = field(default_factory=list)
 
-    # Hypotheses
     hypotheses: list[Hypothesis] = field(default_factory=list)
     top_hypothesis: Hypothesis | None = None
     verification_results: list[VerificationResult] = field(default_factory=list)
 
-    # Solution
-    proposed_patch: str | None = None           # unified diff
+    proposed_patch: str | None = None
     changed_files: list[str] = field(default_factory=list)
     sandbox_test_output: str | None = None
     test_passed: bool = False
     security_findings: list[dict[str, Any]] = field(default_factory=list)
 
-    # PR
     pull_request_url: str | None = None
     pull_request_number: int | None = None
 
-    # Budget tracking
     last_cost_usd: float = 0.0
     total_model_calls: int = 0
-
-    # Model messages (used by handlers)
     conversation: list[dict[str, Any]] = field(default_factory=list)
-
-    # Arbitrary handler-specific scratchpad
     scratchpad: dict[str, Any] = field(default_factory=dict)
-
-    # ── Factory ───────────────────────────────────────────────────────────────
 
     @classmethod
     async def from_mission(cls, mission: Mission) -> MissionContext:
-        """Restore from a persisted checkpoint, or create fresh."""
         if mission.checkpoint:
             return cls._from_checkpoint(mission.checkpoint, mission)
         return cls(
@@ -102,10 +87,8 @@ class MissionContext:
             attachments=mission.attachments or [],
         )
 
-    # ── Serialisation ─────────────────────────────────────────────────────────
-
     def to_checkpoint(self) -> dict[str, Any]:
-        """Serialise context to JSON-safe dict for DB persistence."""
+        """Serialise every recruiter-visible field to a JSON-safe checkpoint."""
         return {
             "mission_id": str(self.mission_id),
             "title": self.title,
@@ -113,70 +96,84 @@ class MissionContext:
             "attachments": self.attachments,
             "plan": [
                 {
-                    "step_id": s.step_id,
-                    "description": s.description,
-                    "skill_name": s.skill_name,
-                    "estimated_cost_usd": s.estimated_cost_usd,
-                    "completed": s.completed,
+                    "step_id": step.step_id,
+                    "description": step.description,
+                    "skill_name": step.skill_name,
+                    "estimated_cost_usd": step.estimated_cost_usd,
+                    "completed": step.completed,
                 }
-                for s in self.plan
+                for step in self.plan
             ],
             "current_plan_step": self.current_plan_step,
             "repository_url": self.repository_url,
+            "repository_path": self.repository_path,
             "environment_summary": self.environment_summary,
+            "raw_evidence": self.raw_evidence,
+            "relevant_files": self.relevant_files,
+            "log_excerpts": self.log_excerpts,
             "hypotheses": [
                 {
-                    "id": h.id,
-                    "description": h.description,
-                    "confidence": h.confidence,
-                    "evidence": h.evidence,
-                    "rank": h.rank,
+                    "id": hypothesis.id,
+                    "description": hypothesis.description,
+                    "confidence": hypothesis.confidence,
+                    "evidence": hypothesis.evidence,
+                    "rank": hypothesis.rank,
                 }
-                for h in self.hypotheses
+                for hypothesis in self.hypotheses
+            ],
+            "verification_results": [
+                {
+                    "hypothesis_id": result.hypothesis_id,
+                    "confirmed": result.confirmed,
+                    "confidence": result.confidence,
+                    "findings": result.findings,
+                }
+                for result in self.verification_results
             ],
             "proposed_patch": self.proposed_patch,
             "changed_files": self.changed_files,
+            "sandbox_test_output": self.sandbox_test_output,
             "test_passed": self.test_passed,
             "pull_request_url": self.pull_request_url,
+            "pull_request_number": self.pull_request_number,
             "security_findings": self.security_findings,
+            "last_cost_usd": self.last_cost_usd,
             "total_model_calls": self.total_model_calls,
+            "conversation": self.conversation,
             "scratchpad": self.scratchpad,
         }
 
     def to_checkpoint_metadata(self) -> dict[str, Any]:
-        """Lightweight metadata for state transition audit logs."""
         return {
             "plan_step": self.current_plan_step,
             "total_plan_steps": len(self.plan),
+            "evidence_count": len(self.raw_evidence),
             "hypothesis_count": len(self.hypotheses),
             "has_patch": self.proposed_patch is not None,
             "test_passed": self.test_passed,
         }
 
     def update(self, result: dict[str, Any] | None) -> None:
-        """Merge a handler result dict into the context."""
         if not result:
             return
         for key, value in result.items():
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
-
     def add_evidence(
         self, source: str, content: str, metadata: dict[str, Any] | None = None
     ) -> None:
-        self.raw_evidence.append({
-            "source": source,
-            "content": content,
-            "metadata": metadata or {},
-        })
+        self.raw_evidence.append(
+            {
+                "source": source,
+                "content": content,
+                "metadata": metadata or {},
+            }
+        )
 
     def add_model_cost(self, cost_usd: float) -> None:
         self.last_cost_usd = cost_usd
         self.total_model_calls += 1
-
-    # ── Private ───────────────────────────────────────────────────────────────
 
     @classmethod
     def _from_checkpoint(cls, cp: dict[str, Any], mission: Mission) -> MissionContext:
@@ -188,33 +185,50 @@ class MissionContext:
         )
         ctx.plan = [
             PlanStep(
-                step_id=s["step_id"],
-                description=s["description"],
-                skill_name=s.get("skill_name"),
-                estimated_cost_usd=s.get("estimated_cost_usd", 0.0),
-                completed=s.get("completed", False),
+                step_id=step["step_id"],
+                description=step["description"],
+                skill_name=step.get("skill_name"),
+                estimated_cost_usd=step.get("estimated_cost_usd", 0.0),
+                completed=step.get("completed", False),
             )
-            for s in cp.get("plan", [])
+            for step in cp.get("plan", [])
         ]
         ctx.current_plan_step = cp.get("current_plan_step", 0)
         ctx.repository_url = cp.get("repository_url")
+        ctx.repository_path = cp.get("repository_path")
         ctx.environment_summary = cp.get("environment_summary", "")
+        ctx.raw_evidence = cp.get("raw_evidence", [])
+        ctx.relevant_files = cp.get("relevant_files", [])
+        ctx.log_excerpts = cp.get("log_excerpts", [])
         ctx.hypotheses = [
             Hypothesis(
-                id=h["id"],
-                description=h["description"],
-                confidence=h["confidence"],
-                evidence=h["evidence"],
-                rank=h.get("rank", 0),
+                id=hypothesis["id"],
+                description=hypothesis["description"],
+                confidence=hypothesis["confidence"],
+                evidence=hypothesis.get("evidence", []),
+                rank=hypothesis.get("rank", 0),
             )
-            for h in cp.get("hypotheses", [])
+            for hypothesis in cp.get("hypotheses", [])
         ]
         ctx.top_hypothesis = ctx.hypotheses[0] if ctx.hypotheses else None
+        ctx.verification_results = [
+            VerificationResult(
+                hypothesis_id=result["hypothesis_id"],
+                confirmed=result["confirmed"],
+                confidence=result["confidence"],
+                findings=result.get("findings", []),
+            )
+            for result in cp.get("verification_results", [])
+        ]
         ctx.proposed_patch = cp.get("proposed_patch")
         ctx.changed_files = cp.get("changed_files", [])
+        ctx.sandbox_test_output = cp.get("sandbox_test_output")
         ctx.test_passed = cp.get("test_passed", False)
         ctx.pull_request_url = cp.get("pull_request_url")
+        ctx.pull_request_number = cp.get("pull_request_number")
         ctx.security_findings = cp.get("security_findings", [])
+        ctx.last_cost_usd = cp.get("last_cost_usd", 0.0)
         ctx.total_model_calls = cp.get("total_model_calls", 0)
+        ctx.conversation = cp.get("conversation", [])
         ctx.scratchpad = cp.get("scratchpad", {})
         return ctx
