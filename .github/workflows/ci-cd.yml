@@ -1,12 +1,4 @@
 # ForgeOps AI — GitHub Actions CI/CD pipeline
-#
-# Workflow:
-#   1. On every push to main or PR: lint + typecheck + test
-#   2. On push to main: build Docker images, push to registry, deploy
-#
-# Supports both AWS ECS and Azure Container Apps.
-# Set DEPLOY_TARGET variable to "aws" or "azure" to select the target.
-# Defaults to "aws" if not set.
 
 name: CI / CD
 
@@ -140,9 +132,9 @@ jobs:
         id: registry
         run: |
           if [ "${{ vars.DEPLOY_TARGET }}" = "azure" ]; then
-            echo "url=${{ vars.ACR_LOGIN_SERVER }}" >> $GITHUB_OUTPUT
+            echo "url=${{ vars.ACR_LOGIN_SERVER }}" >> "$GITHUB_OUTPUT"
           else
-            echo "url=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_OUTPUT
+            echo "url=${{ steps.login-ecr.outputs.registry }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push ${{ matrix.service.name }}
@@ -234,13 +226,61 @@ jobs:
           az provider register -n Microsoft.App --wait
           az provider register -n Microsoft.OperationalInsights --wait
 
-      - name: Update API Container App
+      - name: Configure optional LLM provider secrets
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CUSTOM_OPENAI_API_KEY: ${{ secrets.CUSTOM_OPENAI_API_KEY }}
         run: |
+          APP="forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api"
+          RG="forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg"
+          SECRET_ARGS=()
+
+          [ -n "$OPENAI_API_KEY" ] && SECRET_ARGS+=("openai-api-key=$OPENAI_API_KEY")
+          [ -n "$ANTHROPIC_API_KEY" ] && SECRET_ARGS+=("anthropic-api-key=$ANTHROPIC_API_KEY")
+          [ -n "$GROQ_API_KEY" ] && SECRET_ARGS+=("groq-api-key=$GROQ_API_KEY")
+          [ -n "$OPENROUTER_API_KEY" ] && SECRET_ARGS+=("openrouter-api-key=$OPENROUTER_API_KEY")
+          [ -n "$CUSTOM_OPENAI_API_KEY" ] && SECRET_ARGS+=("custom-openai-api-key=$CUSTOM_OPENAI_API_KEY")
+
+          if [ ${#SECRET_ARGS[@]} -gt 0 ]; then
+            az containerapp secret set \
+              --name "$APP" \
+              --resource-group "$RG" \
+              --secrets "${SECRET_ARGS[@]}"
+          fi
+
+      - name: Update API Container App
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CUSTOM_OPENAI_API_KEY: ${{ secrets.CUSTOM_OPENAI_API_KEY }}
+        run: |
+          ENV_ARGS=(
+            "DEMO_MODE=${{ vars.DEMO_MODE || 'false' }}"
+            "DEFAULT_LLM_PROVIDER=${{ vars.DEFAULT_LLM_PROVIDER || 'demo' }}"
+            "DEFAULT_LLM_MODEL=${{ vars.DEFAULT_LLM_MODEL || 'forgeops-demo' }}"
+            "GROQ_BASE_URL=${{ vars.GROQ_BASE_URL || 'https://api.groq.com/openai/v1' }}"
+            "OPENROUTER_BASE_URL=${{ vars.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1' }}"
+            "OLLAMA_BASE_URL=${{ vars.OLLAMA_BASE_URL }}"
+            "CUSTOM_OPENAI_NAME=${{ vars.CUSTOM_OPENAI_NAME || 'Custom OpenAI-compatible' }}"
+            "CUSTOM_OPENAI_BASE_URL=${{ vars.CUSTOM_OPENAI_BASE_URL }}"
+          )
+
+          [ -n "$OPENAI_API_KEY" ] && ENV_ARGS+=("OPENAI_API_KEY=secretref:openai-api-key")
+          [ -n "$ANTHROPIC_API_KEY" ] && ENV_ARGS+=("ANTHROPIC_API_KEY=secretref:anthropic-api-key")
+          [ -n "$GROQ_API_KEY" ] && ENV_ARGS+=("GROQ_API_KEY=secretref:groq-api-key")
+          [ -n "$OPENROUTER_API_KEY" ] && ENV_ARGS+=("OPENROUTER_API_KEY=secretref:openrouter-api-key")
+          [ -n "$CUSTOM_OPENAI_API_KEY" ] && ENV_ARGS+=("CUSTOM_OPENAI_API_KEY=secretref:custom-openai-api-key")
+
           az containerapp update \
             --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
             --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
             --image "${{ vars.ACR_LOGIN_SERVER }}/forgeops-api:${{ env.IMAGE_TAG }}" \
-            --set-env-vars "DEMO_MODE=true"
+            --set-env-vars "${ENV_ARGS[@]}"
 
       - name: Update Web Container App
         run: |
