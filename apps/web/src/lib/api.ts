@@ -1,10 +1,4 @@
-/**
- * API client — typed wrappers for ForgeOps REST endpoints.
- *
- * Browser requests stay on the web app origin and are forwarded by the
- * Next.js proxy route at /api/backend/[...path]. This avoids CORS and stale
- * NEXT_PUBLIC_API_URL values embedded in old browser bundles.
- */
+/** Typed API client for ForgeOps Mission Control. */
 
 const API = "/api/backend";
 
@@ -20,13 +14,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-import type { Approval, Mission, MemoryEntry, Skill } from "@/types";
-
-// ── Missions ──────────────────────────────────────────────────────────────────
+import type {
+  Approval,
+  MemoryEntry,
+  Mission,
+  ModelCatalog,
+  Skill,
+} from "@/types";
 
 export function createMission(payload: {
   title: string;
   description: string;
+  llm_provider: string;
+  llm_model: string;
   max_steps?: number;
   max_cost_usd?: number;
 }): Promise<Mission> {
@@ -52,7 +52,9 @@ export function resumeMission(id: string): Promise<{ status: string }> {
   return request(`/api/v1/missions/${id}/resume`, { method: "POST" });
 }
 
-// ── Approvals ─────────────────────────────────────────────────────────────────
+export function listModelProviders(): Promise<ModelCatalog> {
+  return request("/api/v1/models");
+}
 
 export function listPendingApprovals(): Promise<Approval[]> {
   return request("/api/v1/approvals/pending");
@@ -70,13 +72,9 @@ export function decideApproval(
   });
 }
 
-// ── Skills ────────────────────────────────────────────────────────────────────
-
 export function listSkills(): Promise<Skill[]> {
   return request("/api/v1/skills");
 }
-
-// ── Memory ────────────────────────────────────────────────────────────────────
 
 export function getMissionMemory(missionId: string): Promise<MemoryEntry[]> {
   return request(`/api/v1/memory/missions/${missionId}`);
