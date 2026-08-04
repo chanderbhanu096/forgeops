@@ -1,16 +1,4 @@
-"""
-ForgeOps Agent Runtime — persistent state machine engine.
-
-Each mission runs as a durable state machine. State is persisted to
-PostgreSQL at every transition so the process can crash and resume from
-the last committed state with no work lost.
-
-State machine:
-    MISSION_RECEIVED → ENVIRONMENT_DISCOVERY → PLAN_GENERATION
-    → EVIDENCE_COLLECTION → HYPOTHESIS_CREATION → HYPOTHESIS_VERIFICATION
-    → SOLUTION_GENERATION → SANDBOX_EXECUTION → TEST_AND_REVIEW
-    → HUMAN_APPROVAL → EXECUTION → POST_ACTION_MONITORING → completed
-"""
+"""ForgeOps persistent mission state-machine runtime."""
 from __future__ import annotations
 
 import asyncio
@@ -36,22 +24,18 @@ from forgeops.agent.handlers import (
     handle_solution_generation,
     handle_test_and_review,
 )
+from forgeops.agent.model_selection import reset_model_selection, set_model_selection
 from forgeops.config import get_settings
 from forgeops.models.orm import AgentState, Mission, MissionStatus, StateTransition
 
 log = structlog.get_logger(__name__)
-
-# ── Valid transitions ─────────────────────────────────────────────────────────
 
 TRANSITIONS: dict[AgentState | None, list[AgentState]] = {
     None: [AgentState.mission_received],
     AgentState.mission_received: [AgentState.environment_discovery, AgentState.failed],
     AgentState.environment_discovery: [AgentState.plan_generation, AgentState.failed],
     AgentState.plan_generation: [AgentState.evidence_collection, AgentState.failed],
-    AgentState.evidence_collection: [
-        AgentState.hypothesis_creation,
-        AgentState.failed,
-    ],
+    AgentState.evidence_collection: [AgentState.hypothesis_creation, AgentState.failed],
     AgentState.hypothesis_creation: [
         AgentState.hypothesis_verification,
         AgentState.failed,
@@ -68,10 +52,7 @@ TRANSITIONS: dict[AgentState | None, list[AgentState]] = {
         AgentState.solution_generation,
         AgentState.failed,
     ],
-    AgentState.human_approval: [
-        AgentState.execution,
-        AgentState.failed,
-    ],
+    AgentState.human_approval: [AgentState.execution, AgentState.failed],
     AgentState.execution: [AgentState.post_action_monitoring, AgentState.failed],
     AgentState.post_action_monitoring: [AgentState.completed, AgentState.failed],
     AgentState.completed: [],
@@ -93,7 +74,7 @@ HANDLERS = {
 
 
 class BudgetExceededError(RuntimeError):
-    """Raised when the mission exhausts its step, cost or time budget."""
+    """Raised when a mission exhausts its configured budget."""
 
 
 class InvalidTransitionError(RuntimeError):
@@ -110,12 +91,27 @@ class AgentRuntime:
         self._log = log.bind(mission_id=str(mission_id))
 
     async def run(self) -> AsyncGenerator[dict[str, Any], None]:
-        """Drive the state machine until completion, failure, or a budget limit."""
+        """Run using the provider/model stored on this mission."""
         mission = await self._load_mission()
+        token = set_model_selection(mission.llm_provider, mission.llm_model)
+        self._log = self._log.bind(
+            llm_provider=mission.llm_provider,
+            llm_model=mission.llm_model,
+        )
+        try:
+            async for event in self._run_selected(mission):
+                yield event
+        finally:
+            reset_model_selection(token)
+
+    async def _run_selected(
+        self, mission: Mission
+    ) -> AsyncGenerator[dict[str, Any], None]:
         ctx = await MissionContext.from_mission(mission)
         start_time = time.monotonic()
+        is_demo = mission.llm_provider == "demo"
 
-        if self._settings.demo_mode:
+        if is_demo:
             self._log.info("demo_mode_enabled")
 
         if mission.current_state is None:
@@ -147,14 +143,13 @@ class AgentRuntime:
                 mission.current_state == AgentState.human_approval
                 and fresh.status != MissionStatus.approved
             ):
-                if self._settings.demo_mode:
+                if is_demo:
                     await self._db.execute(
                         update(Mission)
                         .where(Mission.id == mission.id)
                         .values(status=MissionStatus.approved)
                     )
                     await self._db.commit()
-                    fresh.status = MissionStatus.approved
                     mission.status = MissionStatus.approved
                     self._log.info("demo_approval_granted")
                 else:
@@ -170,8 +165,7 @@ class AgentRuntime:
             yield self._event("state_starting", {"state": next_state})
 
             try:
-                if self._settings.demo_mode:
-                    # Simulate visible progress without calling paid models or MCP tools.
+                if is_demo:
                     await asyncio.sleep(0.6)
                 else:
                     handler = HANDLERS.get(next_state)
@@ -190,7 +184,8 @@ class AgentRuntime:
                         "state": next_state,
                         "steps_used": mission.steps_used,
                         "cost_usd": mission.cost_usd_used,
-                        "demo_mode": self._settings.demo_mode,
+                        "provider": mission.llm_provider,
+                        "model": mission.llm_model,
                     },
                 )
 
@@ -211,18 +206,20 @@ class AgentRuntime:
         )
 
     async def resume_after_approval(self) -> AsyncGenerator[dict[str, Any], None]:
-        """Resume execution after approval."""
         mission = await self._load_mission()
         if mission.current_state != AgentState.human_approval:
             return
-        ctx = await MissionContext.from_mission(mission)
-        await self._transition(mission, AgentState.execution, ctx)
-        async for event in self.run():
-            yield event
+        token = set_model_selection(mission.llm_provider, mission.llm_model)
+        try:
+            ctx = await MissionContext.from_mission(mission)
+            await self._transition(mission, AgentState.execution, ctx)
+            async for event in self._run_selected(mission):
+                yield event
+        finally:
+            reset_model_selection(token)
 
     def _next_runnable_state(self, current: AgentState | None) -> AgentState | None:
-        successors = TRANSITIONS.get(current, [])
-        for successor in successors:
+        for successor in TRANSITIONS.get(current, []):
             if successor != AgentState.failed:
                 return successor
         return None
@@ -249,18 +246,19 @@ class AgentRuntime:
         )
         self._db.add(transition)
 
+        new_status = self._state_to_status(to_state)
         await self._db.execute(
             update(Mission)
             .where(Mission.id == mission.id)
             .values(
                 current_state=to_state,
                 checkpoint=ctx.to_checkpoint(),
-                status=self._state_to_status(to_state),
+                status=new_status,
             )
         )
         await self._db.commit()
         mission.current_state = to_state
-        mission.status = self._state_to_status(to_state)
+        mission.status = new_status
 
         self._log.info(
             "state_transition",
