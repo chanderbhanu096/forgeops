@@ -295,17 +295,19 @@ class AgentRuntime:
         mission.status = MissionStatus.failed
 
     async def _record_step(self, mission: Mission, cost_usd: float) -> None:
+        # Use explicit values instead of SQL expressions. SQLAlchemy synchronizes
+        # UPDATE expressions back into the identity map, so manually incrementing
+        # afterward would count every state twice.
+        new_steps = mission.steps_used + 1
+        new_cost = mission.cost_usd_used + cost_usd
         await self._db.execute(
             update(Mission)
             .where(Mission.id == mission.id)
-            .values(
-                steps_used=Mission.steps_used + 1,
-                cost_usd_used=Mission.cost_usd_used + cost_usd,
-            )
+            .values(steps_used=new_steps, cost_usd_used=new_cost)
         )
         await self._db.commit()
-        mission.steps_used += 1
-        mission.cost_usd_used += cost_usd
+        mission.steps_used = new_steps
+        mission.cost_usd_used = new_cost
 
     async def _load_mission(self) -> Mission:
         result = await self._db.execute(
