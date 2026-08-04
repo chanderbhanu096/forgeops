@@ -5,13 +5,22 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forgeops.agent.context import MissionContext
 from forgeops.agent.runtime import AgentRuntime, HANDLERS
 from forgeops.approval_service import ensure_pending_approval
 from forgeops.models.orm import AgentState, Approval, Mission, MissionStatus
+
+
+async def _cleanup_mission(db_session: AsyncSession, mission: Mission) -> None:
+    """Remove a test mission and its approvals from the shared SQLite database."""
+    await db_session.execute(
+        delete(Approval).where(Approval.mission_id == mission.id)
+    )
+    await db_session.execute(delete(Mission).where(Mission.id == mission.id))
+    await db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -49,8 +58,7 @@ async def test_ensure_pending_approval_is_idempotent(
     assert first.diff is not None
     assert first.risk_level == "medium"
 
-    await db_session.delete(mission)
-    await db_session.commit()
+    await _cleanup_mission(db_session, mission)
 
 
 @pytest.mark.asyncio
@@ -80,8 +88,7 @@ async def test_pending_endpoint_repairs_orphaned_mission(
     assert response.status_code == 200
     assert any(item["mission_id"] == str(mission.id) for item in response.json())
 
-    await db_session.delete(mission)
-    await db_session.commit()
+    await _cleanup_mission(db_session, mission)
 
 
 @pytest.mark.asyncio
@@ -130,5 +137,4 @@ async def test_resume_after_approval_runs_execution_handler(
     assert called == [AgentState.execution, AgentState.post_action_monitoring]
     assert any(event["type"] == "completed" for event in events)
 
-    await db_session.delete(mission)
-    await db_session.commit()
+    await _cleanup_mission(db_session, mission)
