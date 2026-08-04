@@ -12,6 +12,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forgeops.agent.context import MissionContext
+from forgeops.agent.demo_scenario import demo_state_update
 from forgeops.agent.handlers import (
     handle_environment_discovery,
     handle_evidence_collection,
@@ -174,7 +175,8 @@ class AgentRuntime:
 
             try:
                 if is_demo:
-                    await asyncio.sleep(0.6)
+                    ctx.update(demo_state_update(next_state, ctx))
+                    await asyncio.sleep(0.25)
                 else:
                     handler = HANDLERS.get(next_state)
                     if handler is not None:
@@ -305,9 +307,6 @@ class AgentRuntime:
         mission.status = MissionStatus.failed
 
     async def _record_step(self, mission: Mission, cost_usd: float) -> None:
-        # Use explicit values instead of SQL expressions. SQLAlchemy synchronizes
-        # UPDATE expressions back into the identity map, so manually incrementing
-        # afterward would count every state twice.
         new_steps = mission.steps_used + 1
         new_cost = mission.cost_usd_used + cost_usd
         await self._db.execute(
