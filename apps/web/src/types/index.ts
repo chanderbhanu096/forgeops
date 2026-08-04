@@ -1,6 +1,4 @@
-/**
- * Shared TypeScript types for the ForgeOps Mission Control UI.
- */
+/** Shared TypeScript types for ForgeOps Mission Control. */
 
 export type MissionStatus =
   | "pending"
@@ -42,6 +40,24 @@ export interface Mission {
   pull_request_url: string | null;
   error: string | null;
   created_at: string;
+  llm_provider: string;
+  llm_model: string;
+}
+
+export interface ModelProvider {
+  id: string;
+  label: string;
+  configured: boolean;
+  models: string[];
+  default_model: string;
+  supports_custom_model: boolean;
+  configuration_hint: string;
+}
+
+export interface ModelCatalog {
+  providers: ModelProvider[];
+  default_provider: string;
+  default_model: string;
 }
 
 export interface Approval {
@@ -82,7 +98,6 @@ export interface SSEEvent {
   data: Record<string, unknown>;
 }
 
-// Ordered display states for the execution graph
 export const STATE_ORDER: AgentState[] = [
   "mission_received",
   "environment_discovery",
