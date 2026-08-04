@@ -73,12 +73,18 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
         )
         ctx.add_evidence(
             source="apps/api/database.py",
-            content="create_async_engine(DATABASE_URL, pool_size=5, max_overflow=0)",
+            content=(
+                "create_async_engine(DATABASE_URL, pool_size=5, "
+                "max_overflow=0)"
+            ),
             metadata={"citation": "database.py:12", "score": 0.96},
         )
         ctx.add_evidence(
             source="apps/api/routes/health.py",
-            content="The /health route returns process status and does not acquire a DB connection.",
+            content=(
+                "The /health route returns process status and does not acquire "
+                "a DB connection."
+            ),
             metadata={"citation": "health.py:8-14", "score": 0.91},
         )
         return {
@@ -94,8 +100,9 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
             "scratchpad": {
                 **ctx.scratchpad,
                 "retrieval_summary": (
-                    "The health route never touches PostgreSQL, while checkout requests require a "
-                    "database connection. Failure logs consistently show connection-pool exhaustion."
+                    "The health route never touches PostgreSQL, while checkout "
+                    "requests require a database connection. Failure logs "
+                    "consistently show connection-pool exhaustion."
                 ),
                 "retrieval_citations": [
                     "checkout-api.log:184-190 — pool timeout during checkout",
@@ -111,8 +118,9 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
             Hypothesis(
                 id="H1",
                 description=(
-                    "The PostgreSQL connection pool is too small for checkout concurrency, "
-                    "causing requests to time out while the lightweight health endpoint remains green."
+                    "The PostgreSQL connection pool is too small for checkout "
+                    "concurrency, causing requests to time out while the "
+                    "lightweight health endpoint remains green."
                 ),
                 confidence=0.94,
                 evidence=[
@@ -126,7 +134,10 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
                 id="H2",
                 description="Redis latency is delaying checkout processing.",
                 confidence=0.22,
-                evidence=["Redis is used by the service, but no Redis timeout appears in the logs"],
+                evidence=[
+                    "Redis is used by the service, but no Redis timeout appears "
+                    "in the logs"
+                ],
                 rank=1,
             ),
             Hypothesis(
@@ -148,7 +159,7 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
                     "confidence": 0.94,
                     "findings": [
                         "Every sampled checkout failure coincides with a pool timeout",
-                        "Health checks stay green because they do not test database availability",
+                        "Health checks stay green because they do not test DB availability",
                         "No supporting evidence was found for Redis or CPU exhaustion",
                     ],
                     "needs_more_evidence": False,
@@ -176,12 +187,13 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
             "scratchpad": {
                 **ctx.scratchpad,
                 "solution_explanation": (
-                    "Increase pool capacity for expected checkout concurrency, fail faster when the "
-                    "pool is exhausted, and validate stale connections before use."
+                    "Increase pool capacity for expected checkout concurrency, "
+                    "fail faster when the pool is exhausted, and validate stale "
+                    "connections before use."
                 ),
                 "recommended_regression_tests": [
                     "Run 25 concurrent checkout requests and assert no pool timeout",
-                    "Simulate a stale PostgreSQL connection and verify pool_pre_ping recovery",
+                    "Simulate a stale DB connection and verify pool_pre_ping recovery",
                     "Add a readiness check that verifies database connectivity",
                 ],
             },
@@ -204,8 +216,9 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
                 {
                     "severity": "low",
                     "description": (
-                        "Higher pool capacity increases database connection usage; verify that the "
-                        "managed PostgreSQL tier supports the new maximum."
+                        "Higher pool capacity increases database connection usage; "
+                        "verify that the managed PostgreSQL tier supports the new "
+                        "maximum."
                     ),
                     "location": "apps/api/database.py",
                 }
@@ -225,15 +238,15 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
                 "agent_pipeline": {
                     "revision_cycles": 0,
                     "judge_summary": (
-                        "The evidence supports connection-pool exhaustion as the root cause. "
-                        "The proposed one-file configuration change is minimal, reversible and "
-                        "validated under concurrent load."
+                        "The evidence supports connection-pool exhaustion as the "
+                        "root cause. The proposed one-file configuration change "
+                        "is minimal, reversible and validated under concurrent load."
                     ),
                     "confidence": 0.94,
                     "reviewer_comments": [
                         "Add database connectivity to readiness checks",
                         "Monitor active connections and pool wait time after deployment",
-                        "Confirm the PostgreSQL service connection limit before production rollout",
+                        "Confirm the PostgreSQL connection limit before rollout",
                     ],
                 },
             },
@@ -252,7 +265,7 @@ def demo_state_update(state: AgentState, ctx: MissionContext) -> dict[str, Any]:
                 "monitoring": {
                     "status": "healthy",
                     "observations": [
-                        "Checkout success rate: 100% in the simulated post-deployment window",
+                        "Checkout success rate: 100% in the simulated window",
                         "Pool wait timeout count: 0",
                         "p95 checkout latency improved from 31.2s to 420ms",
                     ],
