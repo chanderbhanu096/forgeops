@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">ForgeOps Approval Centre preview</title>
+  <desc id="desc">A dark approval interface showing risk, evidence, a code diff and approve or reject actions.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" rx="24" fill="url(#bg)"/>
+  <rect x="28" y="24" width="1144" height="627" rx="18" fill="#0b1220" stroke="#263247"/>
+  <rect x="28" y="24" width="1144" height="86" rx="18" fill="#101827"/>
+  <text x="62" y="63" fill="#f8fafc" font-size="26" font-family="Arial, sans-serif" font-weight="700">Approval Centre</text>
+  <text x="62" y="88" fill="#94a3b8" font-size="14" font-family="Arial, sans-serif">Review the evidence and generated change before ForgeOps executes it.</text>
+  <rect x="1010" y="45" width="126" height="30" rx="15" fill="#392b13"/>
+  <text x="1030" y="65" fill="#fde68a" font-size="12" font-family="Arial, sans-serif">1 PENDING</text>
+
+  <rect x="62" y="138" width="1074" height="448" rx="16" fill="#111a2a" stroke="#334155"/>
+  <text x="88" y="178" fill="#f8fafc" font-size="19" font-family="Arial, sans-serif" font-weight="700">Approve the generated changes for “Analyze deployment failure”</text>
+  <rect x="88" y="194" width="106" height="28" rx="14" fill="#392b13"/>
+  <text x="107" y="213" fill="#fde68a" font-size="12" font-family="Arial, sans-serif">MEDIUM RISK</text>
+  <text x="210" y="213" fill="#64748b" font-size="12" font-family="Arial, sans-serif">Requested moments ago · Mission 7f2a…</text>
+
+  <rect x="88" y="246" width="480" height="240" rx="12" fill="#0a1220" stroke="#263247"/>
+  <text x="110" y="278" fill="#cbd5e1" font-size="13" font-family="Arial, sans-serif" font-weight="700">WHY APPROVAL IS REQUIRED</text>
+  <text x="110" y="310" fill="#e2e8f0" font-size="14" font-family="Arial, sans-serif">ForgeOps found a step-counter defect and prepared</text>
+  <text x="110" y="334" fill="#e2e8f0" font-size="14" font-family="Arial, sans-serif">a safe code change. Tests passed in the sandbox.</text>
+  <line x1="110" y1="356" x2="544" y2="356" stroke="#263247"/>
+  <text x="110" y="385" fill="#94a3b8" font-size="12" font-family="Arial, sans-serif">EVIDENCE</text>
+  <circle cx="116" cy="410" r="5" fill="#22c55e"/>
+  <text x="132" y="415" fill="#cbd5e1" font-size="13" font-family="Arial, sans-serif">98 automated tests passed</text>
+  <circle cx="116" cy="438" r="5" fill="#22c55e"/>
+  <text x="132" y="443" fill="#cbd5e1" font-size="13" font-family="Arial, sans-serif">No high-severity security findings</text>
+  <circle cx="116" cy="466" r="5" fill="#22c55e"/>
+  <text x="132" y="471" fill="#cbd5e1" font-size="13" font-family="Arial, sans-serif">One file changed</text>
+
+  <rect x="592" y="246" width="518" height="240" rx="12" fill="#07101c" stroke="#263247"/>
+  <text x="614" y="278" fill="#cbd5e1" font-size="13" font-family="Arial, sans-serif" font-weight="700">GENERATED DIFF</text>
+  <text x="614" y="314" fill="#64748b" font-size="13" font-family="monospace">@@ -302,8 +302,8 @@</text>
+  <rect x="608" y="328" width="480" height="34" rx="6" fill="#3a171c"/>
+  <text x="620" y="350" fill="#fecaca" font-size="13" font-family="monospace">- mission.steps_used += 1</text>
+  <rect x="608" y="370" width="480" height="34" rx="6" fill="#123322"/>
+  <text x="620" y="392" fill="#bbf7d0" font-size="13" font-family="monospace">+ mission.steps_used = new_steps</text>
+  <text x="614" y="432" fill="#94a3b8" font-size="12" font-family="Arial, sans-serif">The full diff remains visible before any action is taken.</text>
+  <text x="614" y="457" fill="#67e8f9" font-size="12" font-family="Arial, sans-serif">Human approval is written to the audit trail.</text>
+
+  <text x="88" y="525" fill="#cbd5e1" font-size="12" font-family="Arial, sans-serif" font-weight="700">REVIEW NOTES</text>
+  <rect x="88" y="538" width="668" height="32" rx="8" fill="#0a1220" stroke="#334155"/>
+  <text x="102" y="559" fill="#64748b" font-size="12" font-family="Arial, sans-serif">Optional note for the audit trail…</text>
+  <rect x="782" y="530" width="150" height="42" rx="9" fill="#14532d" stroke="#22c55e"/>
+  <text x="829" y="556" fill="#dcfce7" font-size="14" font-family="Arial, sans-serif" font-weight="700">APPROVE</text>
+  <rect x="946" y="530" width="140" height="42" rx="9" fill="#3f151b" stroke="#ef4444"/>
+  <text x="992" y="556" fill="#fecaca" font-size="14" font-family="Arial, sans-serif" font-weight="700">REJECT</text>
+
+  <text x="600" y="632" text-anchor="middle" fill="#64748b" font-size="12" font-family="Arial, sans-serif">Illustrated preview based on the current ForgeOps interface</text>
+</svg>
