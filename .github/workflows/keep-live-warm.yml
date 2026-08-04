@@ -1,0 +1,35 @@
+name: Keep live app warm
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI / CD"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  warm:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Keep API and web responsive
+        run: |
+          RG="forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg"
+          az containerapp update \
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --resource-group "$RG" \
+            --min-replicas 1
+          az containerapp update \
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-web" \
+            --resource-group "$RG" \
+            --min-replicas 1
