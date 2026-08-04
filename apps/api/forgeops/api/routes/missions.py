@@ -1,6 +1,4 @@
-"""
-Mission routes — CRUD and execution control.
-"""
+"""Mission routes — CRUD and execution control."""
 from __future__ import annotations
 
 import uuid
@@ -12,13 +10,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from forgeops.api.routes.models import list_model_providers
+from forgeops.config import get_settings
 from forgeops.db import get_db
 from forgeops.models.orm import Mission, MissionStatus
 
 router = APIRouter()
-
-
-# ── Request / response schemas ────────────────────────────────────────────────
 
 
 class CreateMissionRequest(BaseModel):
@@ -27,6 +24,8 @@ class CreateMissionRequest(BaseModel):
     max_steps: int = Field(default=50, ge=1, le=200)
     max_cost_usd: float = Field(default=2.0, ge=0.01, le=50.0)
     attachments: list[dict[str, Any]] = Field(default_factory=list)
+    llm_provider: str | None = Field(default=None, min_length=2, max_length=50)
+    llm_model: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class MissionSummary(BaseModel):
@@ -38,21 +37,25 @@ class MissionSummary(BaseModel):
     cost_usd_used: float
     created_at: datetime
     pull_request_url: str | None
+    llm_provider: str
+    llm_model: str
 
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_orm(cls, m: Mission) -> MissionSummary:
-        result_data = m.result or {}
+    def from_orm(cls, mission: Mission) -> MissionSummary:
+        result_data = mission.result or {}
         return cls(
-            id=m.id,
-            title=m.title,
-            status=m.status,
-            current_state=m.current_state,
-            steps_used=m.steps_used,
-            cost_usd_used=m.cost_usd_used,
-            created_at=m.created_at,
+            id=mission.id,
+            title=mission.title,
+            status=mission.status,
+            current_state=mission.current_state,
+            steps_used=mission.steps_used,
+            cost_usd_used=mission.cost_usd_used,
+            created_at=mission.created_at,
             pull_request_url=result_data.get("pull_request_url"),
+            llm_provider=mission.llm_provider,
+            llm_model=mission.llm_model,
         )
 
 
@@ -65,27 +68,26 @@ class MissionDetail(MissionSummary):
     error: str | None = None
 
     @classmethod
-    def from_orm(cls, m: Mission) -> MissionDetail:  # type: ignore[override]
-        result_data = m.result or {}
+    def from_orm(cls, mission: Mission) -> MissionDetail:  # type: ignore[override]
+        result_data = mission.result or {}
         return cls(
-            id=m.id,
-            title=m.title,
-            status=m.status,
-            current_state=m.current_state,
-            steps_used=m.steps_used,
-            cost_usd_used=m.cost_usd_used,
-            created_at=m.created_at,
+            id=mission.id,
+            title=mission.title,
+            status=mission.status,
+            current_state=mission.current_state,
+            steps_used=mission.steps_used,
+            cost_usd_used=mission.cost_usd_used,
+            created_at=mission.created_at,
             pull_request_url=result_data.get("pull_request_url"),
-            description=m.description,
-            max_steps=m.max_steps,
-            max_cost_usd=m.max_cost_usd,
-            checkpoint=m.checkpoint,
-            result=m.result,
-            error=m.error,
+            llm_provider=mission.llm_provider,
+            llm_model=mission.llm_model,
+            description=mission.description,
+            max_steps=mission.max_steps,
+            max_cost_usd=mission.max_cost_usd,
+            checkpoint=mission.checkpoint,
+            result=mission.result,
+            error=mission.error,
         )
-
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=MissionDetail)
@@ -94,10 +96,42 @@ async def create_mission(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> MissionDetail:
-    """Create a new mission and immediately enqueue it for execution."""
-    from forgeops.config import get_settings
-
+    """Create a mission using the selected provider/model and enqueue it."""
     settings = get_settings()
+    provider_id = (
+        body.llm_provider or settings.default_llm_provider
+    ).strip().lower()
+    model_id = (body.llm_model or settings.default_llm_model).strip()
+
+    catalog = await list_model_providers()
+    provider = next(
+        (entry for entry in catalog.providers if entry.id == provider_id),
+        None,
+    )
+    if provider is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown LLM provider: {provider_id}",
+        )
+    if not provider.configured:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Provider '{provider.label}' is not configured. "
+                f"{provider.configuration_hint}"
+            ),
+        )
+    if not model_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A model ID is required.",
+        )
+    if not provider.supports_custom_model and model_id not in provider.models:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Model '{model_id}' is not supported by {provider.label}.",
+        )
+
     mission = Mission(
         title=body.title,
         description=body.description,
@@ -106,6 +140,8 @@ async def create_mission(
         max_duration_seconds=settings.default_max_duration_seconds,
         attachments=body.attachments,
         status=MissionStatus.pending,
+        llm_provider=provider_id,
+        llm_model=model_id,
     )
     db.add(mission)
     await db.commit()
@@ -124,7 +160,7 @@ async def list_missions(
     result = await db.execute(
         select(Mission).order_by(Mission.created_at.desc()).limit(limit).offset(offset)
     )
-    return [MissionSummary.from_orm(m) for m in result.scalars().all()]
+    return [MissionSummary.from_orm(mission) for mission in result.scalars().all()]
 
 
 @router.get("/{mission_id}", response_model=MissionDetail)
@@ -168,9 +204,6 @@ async def resume_mission(
     return {"status": "resumed"}
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
 async def _get_or_404(db: AsyncSession, mission_id: uuid.UUID) -> Mission:
     result = await db.execute(select(Mission).where(Mission.id == mission_id))
     mission = result.scalar_one_or_none()
@@ -187,4 +220,4 @@ async def _run_mission(mission_id: uuid.UUID) -> None:
     async with get_session_factory()() as db:
         runtime = AgentRuntime(db, mission_id)
         async for _event in runtime.run():
-            pass  # events are streamed via SSE — see sse.py
+            pass
