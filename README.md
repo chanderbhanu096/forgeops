@@ -2,118 +2,149 @@
 
 # ⚙️ ForgeOps AI
 
-### An approval-controlled AI engineer for data, cloud and software operations
+### An approval-controlled AI engineer for software, data and cloud incidents
 
-**Give it a mission → watch the investigation → review the evidence → approve before execution.**
+**Investigate → collect evidence → identify root cause → verify a fix → request human approval**
 
 [![CI / CD](https://github.com/chanderbhanu096/forgeops/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/chanderbhanu096/forgeops/actions/workflows/ci-cd.yml)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://postgresql.org)
 
-[**Open the live app**](https://forgeops-staging-web.greenrock-70958585.northeurope.azurecontainerapps.io) · [60-second start](#60-second-start) · [Add an LLM](#add-an-llm-provider) · [Architecture](#architecture)
+[**Open the live demo**](https://forgeops-staging-web.greenrock-70958585.northeurope.azurecontainerapps.io) · [Start locally](#start-in-60-seconds) · [Add an LLM](#add-an-llm-provider) · [Architecture](#architecture)
 
 </div>
 
 ---
 
-## See it working before installing anything
+## What a recruiter can see in two minutes
 
-The screenshots below are captured automatically from the deployed application after a successful release. They are not design mockups.
+Click **Run the guided demo** in the live application. No API key is needed.
 
-### 1. Mission Control
+The demo investigates a checkout API that returns a healthy status while real checkout requests fail. ForgeOps produces a visible report containing:
 
-![Live ForgeOps Mission Control](docs/images/live/01-mission-control.png)
+- The environment and services analyzed
+- A four-step investigation plan
+- Exact evidence with file and log references
+- Three ranked root-cause hypotheses
+- A 94% confidence conclusion
+- A minimal one-file configuration patch
+- Three regression tests
+- Security and operational risks
+- Simulated post-deployment metrics
 
-### 2. Create a mission and choose an AI model
+### Example conclusion produced by the demo
 
-![Live ForgeOps create mission form](docs/images/live/02-create-mission.png)
+> **Root cause:** the PostgreSQL connection pool is limited to five connections with no overflow. Checkout requests time out under concurrency, while the health endpoint stays green because it never opens a database connection.
 
-### 3. Watch the state machine work
+**Evidence shown in the UI:**
 
-![Live ForgeOps execution progress](docs/images/live/03-execution-progress.png)
+```text
+checkout-api.log:184-190 — QueuePool timeout during checkout
+database.py:12          — pool_size=5, max_overflow=0
+health.py:8-14          — health check bypasses PostgreSQL
+```
 
-### 4. Read the actual analysis result
+**Verified outcome:**
 
-![Live ForgeOps AI analysis report](docs/images/live/04-analysis-report.png)
-
-> The screenshots are refreshed by `.github/workflows/capture-live-demo.yml` after deployment.
-
----
-
-## What ForgeOps actually does
-
-ForgeOps is not a chat screen. It is a durable engineering-agent workflow that:
-
-1. Understands the environment.
-2. Builds an investigation plan.
-3. Collects and ranks evidence.
-4. Creates and verifies root-cause hypotheses.
-5. Generates a proposed fix.
-6. Runs deterministic and model-based review.
-7. Shows a human-readable analysis report.
-8. Stops for human approval before execution.
-9. Records state, cost, model, evidence and audit history in PostgreSQL.
-
-The mission result page shows the environment, plan, evidence, hypotheses, confidence, verification findings, changed files and generated patch—not only a progress bar.
+```text
+25 concurrent checkout requests: 25 passed
+Database reconnection test: passed
+p95 checkout latency: 31.2s → 420ms
+Confidence: 94%
+```
 
 ---
 
-# 60-second start
+## Product walkthrough
+
+These working interface previews remain in the repository so the README never contains broken images. The deployment also runs Playwright to capture real PNG screenshots into `docs/images/live/` after a successful release.
+
+### 1. Create a mission and choose the model
+
+![ForgeOps Mission Control](docs/images/mission-control-preview.svg)
+
+### 2. Follow the durable execution graph
+
+![ForgeOps execution graph](docs/images/execution-preview.svg)
+
+### 3. Review the evidence before approval
+
+![ForgeOps Approval Centre](docs/images/approval-centre-preview.svg)
+
+---
+
+## Why this is not another chatbot
+
+A normal chatbot returns text. ForgeOps demonstrates the engineering systems around an AI worker:
+
+- Durable state machine with PostgreSQL checkpoints
+- Per-mission provider and model selection
+- Evidence retrieval and ranked hypotheses
+- Deterministic code, SQL and infrastructure verification
+- Multi-agent builder, reviewer, security and judge roles
+- Step, cost and time budgets
+- Human approval before execution
+- Persistent audit history and operational memory
+- REST APIs, server-sent events and Prometheus metrics
+- Docker, GitHub Actions and Azure Container Apps deployment
+
+---
+
+# Start in 60 seconds
 
 You only need **Git** and **Docker Desktop**.
-
-## 1. Download ForgeOps
 
 ```bash
 git clone https://github.com/chanderbhanu096/forgeops.git
 cd forgeops
 ```
 
-## 2. Create your private settings file
+Create your private environment file:
 
-macOS/Linux:
+**macOS/Linux**
 
 ```bash
 cp .env.example .env
 ```
 
-Windows PowerShell:
+**Windows PowerShell**
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-## 3. Start everything
+Start everything:
 
 ```bash
 docker compose up --build
 ```
 
-The first build takes longer because Docker downloads and builds the services. Later starts are much faster.
+Open:
 
-## 4. Open the app
+```text
+http://localhost:3000
+```
 
-Open **http://localhost:3000**.
-
-Click **Run the guided demo**. No API key is required. ForgeOps fills the mission form, uses the demo model and opens the live result page automatically.
+Click **Run the guided demo**, then **Launch and view progress**. ForgeOps opens the result page automatically.
 
 ### Useful local addresses
 
 | Address | Purpose |
 |---|---|
-| http://localhost:3000 | ForgeOps UI |
-| http://localhost:8000/docs | Interactive API docs |
-| http://localhost:8000/health | API health check |
-| http://localhost:8000/metrics | Prometheus metrics |
+| `http://localhost:3000` | Mission Control |
+| `http://localhost:8000/docs` | Interactive API documentation |
+| `http://localhost:8000/health` | API health check |
+| `http://localhost:8000/metrics` | Prometheus metrics |
 
-## Stop the app
+Stop the stack:
 
 ```bash
 docker compose down
 ```
 
-Remove all local data and start fresh:
+Reset all local data:
 
 ```bash
 docker compose down -v
@@ -123,28 +154,20 @@ docker compose down -v
 
 # Add an LLM provider
 
-ForgeOps always includes the free **Demo simulator**. To use a real model, add one provider to `.env`, restart Docker and select it in the UI.
+Demo mode works without a key. To use a real model, edit `.env`, add one provider, and restart Docker.
 
-## Groq — easiest hosted option
-
-Add these lines to `.env`:
+## Groq
 
 ```dotenv
-GROQ_API_KEY=gsk_your_real_key_here
+GROQ_API_KEY=gsk_your_key_here
 DEFAULT_LLM_PROVIDER=groq
 DEFAULT_LLM_MODEL=openai/gpt-oss-20b
-```
-
-Restart only the API and web containers:
-
-```bash
-docker compose up -d --build api web
 ```
 
 ## OpenAI
 
 ```dotenv
-OPENAI_API_KEY=your_key_here
+OPENAI_API_KEY=sk_your_key_here
 DEFAULT_LLM_PROVIDER=openai
 DEFAULT_LLM_MODEL=gpt-5-mini
 ```
@@ -152,7 +175,7 @@ DEFAULT_LLM_MODEL=gpt-5-mini
 ## Anthropic / Claude
 
 ```dotenv
-ANTHROPIC_API_KEY=your_key_here
+ANTHROPIC_API_KEY=sk-ant-your_key_here
 DEFAULT_LLM_PROVIDER=anthropic
 DEFAULT_LLM_MODEL=claude-sonnet-4-20250514
 ```
@@ -160,14 +183,12 @@ DEFAULT_LLM_MODEL=claude-sonnet-4-20250514
 ## OpenRouter
 
 ```dotenv
-OPENROUTER_API_KEY=your_key_here
+OPENROUTER_API_KEY=sk-or-your_key_here
 DEFAULT_LLM_PROVIDER=openrouter
 DEFAULT_LLM_MODEL=openrouter/auto
 ```
 
-## Ollama — local model, no hosted API key
-
-Start Ollama separately, then add:
+## Ollama
 
 ```dotenv
 OLLAMA_BASE_URL=http://host.docker.internal:11434
@@ -175,231 +196,89 @@ DEFAULT_LLM_PROVIDER=ollama
 DEFAULT_LLM_MODEL=llama3.2
 ```
 
-## Any OpenAI-compatible provider
-
-```dotenv
-CUSTOM_OPENAI_NAME=My provider
-CUSTOM_OPENAI_BASE_URL=https://provider.example.com/v1
-CUSTOM_OPENAI_API_KEY=your_key_here
-DEFAULT_LLM_PROVIDER=custom
-DEFAULT_LLM_MODEL=provider-model-id
-```
-
-Restart:
+Restart after editing `.env`:
 
 ```bash
-docker compose up -d --build api web
+docker compose down
+docker compose up --build
 ```
 
-Confirm that ForgeOps detected the provider:
+Check provider availability:
 
 ```bash
 curl http://localhost:3000/api/backend/api/v1/models
 ```
 
-Look for:
+Your provider should show:
 
 ```json
 "configured": true
 ```
 
-The UI marks configured providers with `✓`. Unconfigured providers remain visible but disabled, with an explanation of which setting is missing.
+API keys stay on the server. They are never returned to the browser or stored in mission records.
 
-More details: [docs/MODEL_PROVIDERS.md](docs/MODEL_PROVIDERS.md)
-
-> Never commit `.env` or paste API keys into source code, README files, screenshots or logs.
+More options: [docs/MODEL_PROVIDERS.md](docs/MODEL_PROVIDERS.md)
 
 ---
 
-# Try this mission
+# How the approval workflow works
 
-**Title**
-
-```text
-Analyze a simulated API deployment failure
-```
-
-**Description**
-
-```text
-Treat this as a simulated, non-destructive incident. Do not access production
-systems or make external changes.
-
-Known facts:
-- The frontend and API health endpoint are reachable.
-- A mission can still fail after the health check passes.
-- The application uses FastAPI, Next.js, PostgreSQL, GitHub Actions and Azure
-  Container Apps.
-
-Produce a visible investigation report containing the environment, investigation
-plan, evidence, three hypotheses, the most likely root cause, a safe remediation,
-regression tests, risks and a confidence score. Stop before destructive action.
-```
-
-For a quick UI demonstration, choose **Demo simulator**. For real model-generated analysis, choose a configured hosted or local provider.
-
----
-
-# Approval workflow
-
-Real-provider missions pause at **Human Approval**.
+Real-provider missions stop before execution.
 
 1. Open the mission result.
-2. Read the analysis report and proposed patch.
+2. Review the root cause, evidence, confidence, patch and risks.
 3. Open **Approval Centre**.
-4. Review the summary, risk and diff.
-5. Click **Approve** to continue or **Reject** to stop.
+4. Approve to continue or reject to stop.
+5. The decision and reviewer notes are saved in PostgreSQL.
 
-ForgeOps persists the decision and resumes from the approval gate only after approval.
-
----
-
-# Why it may feel slow
-
-A real mission makes several sequential model calls for environment discovery, planning, evidence, hypotheses, solution generation, review and monitoring. That is intentional: each stage is persisted and auditable.
-
-Performance improvements included in this repository:
-
-- Home-page API requests run in parallel.
-- Mission creation navigates directly to the result page.
-- Large code patches are collapsed until requested.
-- Completed mission pages stop re-rendering every second.
-- Azure API and web containers keep one warm replica in the provided deployment workflow.
-- Docker and GitHub Actions use build caches.
-
-The Demo simulator is the fastest way to review the interface. Real-model duration depends on provider latency and model size.
-
----
-
-# Troubleshooting
-
-## The website is slow on the first request
-
-A cloud container may still be starting or a new revision may be warming up. Wait a few seconds and refresh once. The Azure workflow keeps one replica warm after deployment, but revision changes can still cause a short warm-up.
-
-## “Failed to fetch”
-
-```bash
-curl http://localhost:8000/health
-docker compose logs --tail=100 api web
-```
-
-Then restart:
-
-```bash
-docker compose restart api web
-```
-
-## Provider says “not configured”
-
-- Put the key in `.env`, not `.env.example`.
-- Use the exact variable name.
-- Restart `api` and `web` after changing `.env`.
-- Check `/api/v1/models` with the command above.
-
-## Mission waits for approval
-
-That is expected for a real provider. Open **Approval Centre**.
-
-## Start completely fresh
-
-```bash
-docker compose down -v
-docker compose up --build
-```
-
----
-
-# What recruiters can evaluate quickly
-
-| Area | Evidence |
-|---|---|
-| AI engineering | Multi-provider model gateway and per-mission routing |
-| Agent systems | Durable state machine, budgets, checkpoints and pause/resume |
-| RAG | Query decomposition, retrieval, reranking, compression and citations |
-| Safety | Deterministic verification, sandboxing and human approval |
-| Backend | Async FastAPI, SQLAlchemy, PostgreSQL and SSE |
-| Frontend | Next.js mission control, live progress and analysis report |
-| Platform | Docker, GitHub Actions, ACR and Azure Container Apps |
-| Testing | Runtime, API, retrieval, memory, verifier and approval tests |
-| Observability | Structured logs, Prometheus and OpenTelemetry |
+Demo mode automatically continues so a recruiter can see the entire lifecycle without credentials.
 
 ---
 
 # Architecture
 
 ```text
-Mission Control UI
-        │ REST + SSE
-        ▼
-FastAPI mission API
-        │
-        ▼
-Durable agent state machine
-        ├── Model gateway: OpenAI / Claude / Groq / OpenRouter / Ollama / custom
-        ├── Retrieval and memory
-        ├── Deterministic verification
-        ├── Multi-agent review
-        └── Human approval gate
-        │
-        ▼
-PostgreSQL + Redis + tool services + observability
-```
-
-## State flow
-
-```text
-MISSION RECEIVED
-→ ENVIRONMENT DISCOVERY
-→ PLAN GENERATION
-→ EVIDENCE COLLECTION
-→ HYPOTHESIS CREATION
-→ HYPOTHESIS VERIFICATION
-→ SOLUTION GENERATION
-→ SANDBOX EXECUTION
-→ TEST AND REVIEW
-→ HUMAN APPROVAL
-→ EXECUTION
-→ POST-ACTION MONITORING
-→ COMPLETED
+┌─────────────────────────────────────────────────────────────┐
+│                     Mission Control UI                      │
+│ mission form · live graph · analysis report · approval      │
+└────────────────────────────┬────────────────────────────────┘
+                             │ REST + SSE
+┌────────────────────────────▼────────────────────────────────┐
+│                         FastAPI API                         │
+│ missions · approvals · models · skills · memory · metrics   │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────┐
+│                  Durable Agent Runtime                      │
+│ checkpoints · budgets · pause/resume · audit transitions    │
+└───────────────┬──────────────────────────────┬──────────────┘
+                │                              │
+┌───────────────▼──────────────┐  ┌────────────▼──────────────┐
+│        Model Gateway         │  │ Retrieval + Verification  │
+│ OpenAI · Claude · Groq       │  │ evidence · ranking · tests│
+│ OpenRouter · Ollama · custom │  │ security · sandbox · judge│
+└──────────────────────────────┘  └───────────────────────────┘
+                │                              │
+┌───────────────▼──────────────────────────────▼──────────────┐
+│             PostgreSQL · Redis · observability             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-# Project structure
-
-```text
-apps/api/                 FastAPI runtime, models, routes and tests
-apps/web/                 Next.js Mission Control
-services/                 Sandbox and MCP-style tool services
-infra/azure/              Azure infrastructure
-infra/aws/                AWS infrastructure
-docs/                     Architecture and provider documentation
-scripts/                  Live demo and screenshot automation
-.github/workflows/        CI/CD and screenshot capture
-```
-
----
-
-# Tests
+# Test the backend
 
 ```bash
 docker compose run --rm api poetry run pytest tests/ -v
 ```
 
-CI runs linting and the complete backend suite before images are built or deployed.
+The CI workflow runs linting and the complete backend test suite before it builds or deploys images.
 
 ---
 
-# Security and scope
+# Current scope
 
-- Provider credentials stay server-side.
-- Demo mode does not access external systems.
-- Real connectors should use least-privilege credentials.
-- Generated changes pass verification and human approval gates.
-- ForgeOps is a portfolio-grade reference implementation. Production adoption would additionally require organization-specific authentication, authorization, evaluation datasets, hardened connectors and compliance controls.
-
----
+ForgeOps is a portfolio-grade engineering platform and reference implementation. The demo scenario is deterministic and clearly labelled; it does not pretend to inspect a real production system. Real repository, cloud and data-platform access requires explicit credentials and hardened connectors.
 
 ## License
 
