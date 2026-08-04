@@ -1,6 +1,4 @@
-"""
-Approval routes — human-in-the-loop decision endpoint.
-"""
+"""Approval routes — human-in-the-loop decision endpoints."""
 from __future__ import annotations
 
 import uuid
@@ -11,14 +9,21 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from forgeops.approval_service import ensure_pending_approval
 from forgeops.db import get_db
-from forgeops.models.orm import Approval, ApprovalDecision, Mission, MissionStatus
+from forgeops.models.orm import (
+    AgentState,
+    Approval,
+    ApprovalDecision,
+    Mission,
+    MissionStatus,
+)
 
 router = APIRouter()
 
 
 class ApprovalDecisionRequest(BaseModel):
-    decision: str       # "approved" | "rejected"
+    decision: str
     reviewer_id: str
     notes: str | None = None
 
@@ -37,6 +42,16 @@ class ApprovalResponse(BaseModel):
 async def list_pending_approvals(
     db: AsyncSession = Depends(get_db),  # noqa: B008
 ) -> list[ApprovalResponse]:
+    """List approvals and repair older missions missing an approval row."""
+    orphaned_result = await db.execute(
+        select(Mission).where(
+            Mission.status == MissionStatus.awaiting_approval,
+            Mission.current_state == AgentState.human_approval,
+        )
+    )
+    for mission in orphaned_result.scalars().all():
+        await ensure_pending_approval(db, mission)
+
     result = await db.execute(
         select(Approval)
         .where(Approval.decision == ApprovalDecision.pending)
@@ -44,15 +59,15 @@ async def list_pending_approvals(
     )
     return [
         ApprovalResponse(
-            id=a.id,
-            mission_id=a.mission_id,
-            summary=a.summary,
-            diff=a.diff,
-            risk_level=a.risk_level,
-            decision=a.decision,
-            created_at=a.created_at,
+            id=approval.id,
+            mission_id=approval.mission_id,
+            summary=approval.summary,
+            diff=approval.diff,
+            risk_level=approval.risk_level,
+            decision=approval.decision,
+            created_at=approval.created_at,
         )
-        for a in result.scalars().all()
+        for approval in result.scalars().all()
     ]
 
 
@@ -86,7 +101,6 @@ async def decide_approval(
     approval.reviewer_notes = body.notes
     approval.decided_at = datetime.now(timezone.utc)  # noqa: UP017
 
-    # Update mission status
     mission_result = await db.execute(
         select(Mission).where(Mission.id == approval.mission_id)
     )
