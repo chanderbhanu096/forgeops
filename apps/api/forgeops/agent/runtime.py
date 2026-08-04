@@ -25,6 +25,7 @@ from forgeops.agent.handlers import (
     handle_test_and_review,
 )
 from forgeops.agent.model_selection import reset_model_selection, set_model_selection
+from forgeops.approval_service import ensure_pending_approval
 from forgeops.config import get_settings
 from forgeops.models.orm import AgentState, Mission, MissionStatus, StateTransition
 
@@ -153,8 +154,15 @@ class AgentRuntime:
                     mission.status = MissionStatus.approved
                     self._log.info("demo_approval_granted")
                 else:
-                    self._log.info("awaiting_human_approval")
-                    yield self._event("awaiting_approval", {})
+                    approval = await ensure_pending_approval(self._db, mission, ctx)
+                    self._log.info(
+                        "awaiting_human_approval",
+                        approval_id=str(approval.id),
+                    )
+                    yield self._event(
+                        "awaiting_approval",
+                        {"approval_id": str(approval.id)},
+                    )
                     return
 
             next_state = self._next_runnable_state(mission.current_state)
@@ -206,13 +214,15 @@ class AgentRuntime:
         )
 
     async def resume_after_approval(self) -> AsyncGenerator[dict[str, Any], None]:
+        """Resume from the approval gate without skipping the execution handler."""
         mission = await self._load_mission()
         if mission.current_state != AgentState.human_approval:
             return
+        if mission.status != MissionStatus.approved:
+            return
+
         token = set_model_selection(mission.llm_provider, mission.llm_model)
         try:
-            ctx = await MissionContext.from_mission(mission)
-            await self._transition(mission, AgentState.execution, ctx)
             async for event in self._run_selected(mission):
                 yield event
         finally:
