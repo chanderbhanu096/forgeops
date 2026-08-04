@@ -19,9 +19,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy import (
-    Enum as SAEnum,
-)
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB as _PGjsonb  # noqa: N811
 from sqlalchemy.dialects.postgresql import UUID as _PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -29,9 +27,6 @@ from sqlalchemy.types import String as SaString
 from sqlalchemy.types import TypeDecorator
 
 from forgeops.db import Base
-
-# ── Cross-database type helpers ───────────────────────────────────────────────
-# _JSONB — JSONB in PostgreSQL, JSON elsewhere (for tests using SQLite)
 
 
 class _JSONB(TypeDecorator[Any]):
@@ -76,7 +71,6 @@ class _UUID(TypeDecorator[uuid.UUID]):
         return uuid.UUID(str(value))
 
 
-# pgvector — optional (skipped in SQLite test environments)
 try:
     from pgvector.sqlalchemy import Vector as _Vector
 
@@ -90,8 +84,6 @@ def _vector_column(dims: int) -> Mapped[list[float] | None]:  # type: ignore[ret
     if _VECTOR_AVAILABLE and _Vector is not None:
         return mapped_column(_Vector(dims), nullable=True)
     return mapped_column(JSON, nullable=True)
-
-# ── Enums ─────────────────────────────────────────────────────────────────────
 
 
 class MissionStatus(StrEnum):
@@ -142,10 +134,7 @@ class ToolCallStatus(StrEnum):
     running = "running"
     succeeded = "succeeded"
     failed = "failed"
-    blocked = "blocked"   # vetoed by security/policy check
-
-
-# ── Missions ──────────────────────────────────────────────────────────────────
+    blocked = "blocked"
 
 
 class Mission(Base):
@@ -157,6 +146,15 @@ class Mission(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # The provider/model are stored per mission so different concurrent missions
+    # can safely use different LLMs.
+    llm_provider: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="demo"
+    )
+    llm_model: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="forgeops-demo"
+    )
+
     status: Mapped[MissionStatus] = mapped_column(
         SAEnum(MissionStatus, name="mission_status"),
         nullable=False,
@@ -166,22 +164,18 @@ class Mission(Base):
         SAEnum(AgentState, name="agent_state"), nullable=True
     )
 
-    # Budget tracking
     max_steps: Mapped[int] = mapped_column(Integer, default=50)
     steps_used: Mapped[int] = mapped_column(Integer, default=0)
     max_cost_usd: Mapped[float] = mapped_column(Float, default=2.0)
     cost_usd_used: Mapped[float] = mapped_column(Float, default=0.0)
     max_duration_seconds: Mapped[int] = mapped_column(Integer, default=600)
 
-    # Checkpointing
     checkpoint: Mapped[dict[str, Any] | None] = mapped_column(_JSONB(), nullable=True)
 
-    # Multimodal inputs
     attachments: Mapped[list[dict[str, Any]]] = mapped_column(
         _JSONB(), default=list, nullable=False
     )
 
-    # Outcome
     result: Mapped[dict[str, Any] | None] = mapped_column(_JSONB(), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -198,7 +192,6 @@ class Mission(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # Relations
     state_transitions: Mapped[list[StateTransition]] = relationship(
         back_populates="mission", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -250,9 +243,6 @@ class StateTransition(Base):
     __table_args__ = (Index("ix_state_transitions_mission_id", "mission_id"),)
 
 
-# ── Tool calls ────────────────────────────────────────────────────────────────
-
-
 class ToolCall(Base):
     """Record of every MCP tool invocation."""
 
@@ -266,7 +256,7 @@ class ToolCall(Base):
     )
 
     tool_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    server: Mapped[str] = mapped_column(String(100), nullable=False)  # mcp server name
+    server: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[ToolCallStatus] = mapped_column(
         SAEnum(ToolCallStatus, name="tool_call_status"),
         nullable=False,
@@ -277,7 +267,6 @@ class ToolCall(Base):
     output: Mapped[dict[str, Any] | None] = mapped_column(_JSONB(), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Cost / latency
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens_used: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -296,9 +285,6 @@ class ToolCall(Base):
     )
 
 
-# ── Skills ────────────────────────────────────────────────────────────────────
-
-
 class Skill(Base):
     """Versioned skill definitions loaded from YAML registry."""
 
@@ -310,7 +296,7 @@ class Skill(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     version: Mapped[str] = mapped_column(String(20), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    spec: Mapped[dict[str, Any]] = mapped_column(_JSONB(), nullable=False)  # full YAML parsed
+    spec: Mapped[dict[str, Any]] = mapped_column(_JSONB(), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -320,9 +306,6 @@ class Skill(Base):
     __table_args__ = (
         Index("ix_skills_name_version", "name", "version", unique=True),
     )
-
-
-# ── Memory ────────────────────────────────────────────────────────────────────
 
 
 class MemoryEntry(Base):
@@ -345,10 +328,8 @@ class MemoryEntry(Base):
         "metadata", _JSONB(), default=dict, nullable=False
     )
 
-    # Vector embedding for semantic search (text-embedding-3-small → 1536 dims)
     embedding: Mapped[list[float] | None] = _vector_column(1536)
 
-    # How many times this memory was retrieved and found useful
     usefulness_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     retrieval_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -361,18 +342,16 @@ class MemoryEntry(Base):
     __table_args__ = (
         Index("ix_memory_entries_type", "memory_type"),
         Index("ix_memory_entries_mission_id", "mission_id"),
-        # HNSW index — PostgreSQL + pgvector only; silently skipped on other DBs
         Index(
             "ix_memory_entries_embedding",
             "embedding",
             postgresql_using="hnsw",
             postgresql_with={"m": 16, "ef_construction": 64},
             postgresql_ops={"embedding": "vector_cosine_ops"},
-        ) if _VECTOR_AVAILABLE else Index("ix_memory_entries_embedding_skip", "content"),
+        )
+        if _VECTOR_AVAILABLE
+        else Index("ix_memory_entries_embedding_skip", "content"),
     )
-
-
-# ── Approvals ─────────────────────────────────────────────────────────────────
 
 
 class Approval(Base):
@@ -387,9 +366,8 @@ class Approval(Base):
         _UUID(), ForeignKey("missions.id", ondelete="CASCADE"), nullable=False
     )
 
-    # What the agent is proposing
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    diff: Mapped[str | None] = mapped_column(Text, nullable=True)   # unified diff
+    diff: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence: Mapped[dict[str, Any]] = mapped_column(_JSONB(), default=dict, nullable=False)
     risk_level: Mapped[str] = mapped_column(String(20), default="medium", nullable=False)
 
