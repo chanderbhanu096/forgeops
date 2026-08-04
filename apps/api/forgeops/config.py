@@ -36,13 +36,60 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
 
     # ── LLM providers ─────────────────────────────────────────────────────────
-    openai_api_key: SecretStr = Field(default=SecretStr(""))
-    anthropic_api_key: SecretStr = Field(default=SecretStr(""))
+    # Credentials always remain on the server. The UI only receives provider
+    # availability and model suggestions, never secret values.
+    openai_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENAI_API_KEY")
+    anthropic_api_key: SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
+    groq_api_key: SecretStr = Field(default=SecretStr(""), alias="GROQ_API_KEY")
+    openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
 
-    # Default model routing
+    groq_base_url: str = Field(
+        default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL"
+    )
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
+    )
+    ollama_base_url: str = Field(default="", alias="OLLAMA_BASE_URL")
+
+    # Any service implementing OpenAI-compatible /chat/completions can be added
+    # without changing ForgeOps code.
+    custom_openai_name: str = Field(
+        default="Custom OpenAI-compatible", alias="CUSTOM_OPENAI_NAME"
+    )
+    custom_openai_base_url: str = Field(default="", alias="CUSTOM_OPENAI_BASE_URL")
+    custom_openai_api_key: SecretStr = Field(
+        default=SecretStr(""), alias="CUSTOM_OPENAI_API_KEY"
+    )
+
+    # Defaults used when an older client creates a mission without an explicit
+    # provider/model. New clients select these per mission.
+    default_llm_provider: str = Field(default="demo", alias="DEFAULT_LLM_PROVIDER")
+    default_llm_model: str = Field(default="forgeops-demo", alias="DEFAULT_LLM_MODEL")
+
+    # Comma-separated suggestions shown in the UI. Users can always type a
+    # different valid model ID, so provider model releases require no code change.
+    openai_models: str = Field(
+        default="gpt-5-mini,gpt-4.1-mini,gpt-4o-mini", alias="OPENAI_MODELS"
+    )
+    anthropic_models: str = Field(
+        default="claude-sonnet-4-20250514,claude-opus-4-20250514",
+        alias="ANTHROPIC_MODELS",
+    )
+    groq_models: str = Field(
+        default="openai/gpt-oss-20b,openai/gpt-oss-120b",
+        alias="GROQ_MODELS",
+    )
+    openrouter_models: str = Field(
+        default="openrouter/auto", alias="OPENROUTER_MODELS"
+    )
+    ollama_models: str = Field(default="llama3.2,qwen2.5-coder", alias="OLLAMA_MODELS")
+    custom_openai_models: str = Field(default="", alias="CUSTOM_OPENAI_MODELS")
+
+    # Legacy defaults retained for code paths that explicitly request a fast
+    # model outside a mission context.
     primary_model: str = "gpt-4o"
-    fallback_model: str = "claude-3-5-sonnet-20241022"
-    fast_model: str = "gpt-4o-mini"        # used for classification, routing
+    fallback_model: str = "claude-sonnet-4-20250514"
+    fast_model: str = "gpt-4o-mini"
 
     # ── MCP ───────────────────────────────────────────────────────────────────
     mcp_secret: SecretStr = Field(default=SecretStr("forgeops_mcp_dev"))
@@ -61,7 +108,7 @@ class Settings(BaseSettings):
     # ── Agent budgets (defaults) ──────────────────────────────────────────────
     default_max_steps: int = 50
     default_max_cost_usd: float = 2.0
-    default_max_duration_seconds: int = 600   # 10 min
+    default_max_duration_seconds: int = 600
 
     # ── Sandbox ───────────────────────────────────────────────────────────────
     sandbox_url: str = "http://sandbox:9000"
