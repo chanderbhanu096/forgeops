@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start API dependencies
+      - name: Start application
         env:
           DEFAULT_LLM_PROVIDER: demo
           DEFAULT_LLM_MODEL: forgeops-demo
@@ -32,9 +32,10 @@ jobs:
           docker compose logs api
           exit 1
 
-      - name: Launch informal mission and verify stream
+      - name: Launch mission and validate the complete generated report
         run: |
           set -euo pipefail
+
           response=$(curl --fail --silent \
             -H 'Content-Type: application/json' \
             -d '{
@@ -46,17 +47,18 @@ jobs:
               "max_cost_usd":2
             }' \
             http://127.0.0.1:8000/api/v1/missions)
+
           mission_id=$(printf '%s' "$response" | jq -r '.id')
           test -n "$mission_id"
           test "$mission_id" != "null"
 
-          timeout 15s curl --no-buffer --silent \
+          timeout 20s curl --no-buffer --silent \
             "http://127.0.0.1:8000/api/v1/stream/$mission_id" \
             > /tmp/mission-events.txt &
           stream_pid=$!
 
           final=''
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 90); do
             final=$(curl --fail --silent \
               "http://127.0.0.1:8000/api/v1/missions/$mission_id")
             status=$(printf '%s' "$final" | jq -r '.status')
@@ -64,28 +66,104 @@ jobs:
               break
             fi
             if [ "$status" = "failed" ]; then
-              printf '%s\n' "$final"
+              printf '%s\n' "$final" | jq .
               exit 1
             fi
             sleep 1
           done
 
-          test "$(printf '%s' "$final" | jq -r '.status')" = "completed"
-          printf '%s' "$final" | jq -e '.checkpoint.environment_summary | length > 20'
-          printf '%s' "$final" | jq -e '.checkpoint.hypotheses | length >= 1'
-          printf '%s' "$final" | jq -e '.checkpoint.proposed_patch | length > 20'
-          printf '%s' "$final" | jq -e '.checkpoint.scratchpad.retrieval_citations | length >= 1'
+          printf '%s' "$final" | jq . > /tmp/mission-report.json
+
+          # Mission completion and identity.
+          jq -e '.status == "completed"' /tmp/mission-report.json
+          jq -e '.current_state == "completed"' /tmp/mission-report.json
+          jq -e '.checkpoint.repository_url == "https://github.com/example/checkout-api"' /tmp/mission-report.json
+
+          # Architecture and investigation plan.
+          jq -e '.checkpoint.environment_summary | length > 120' /tmp/mission-report.json
+          jq -e '.checkpoint.plan | length == 4' /tmp/mission-report.json
+          jq -e '[.checkpoint.plan[] | select((.description | length) > 20 and (.skill_name | length) > 3)] | length == 4' /tmp/mission-report.json
+
+          # Concrete evidence with source-level citations.
+          jq -e '.checkpoint.raw_evidence | length == 3' /tmp/mission-report.json
+          jq -e '[.checkpoint.raw_evidence[] | select((.source | length) > 3 and (.content | length) > 25 and (.metadata.citation | length) > 3)] | length == 3' /tmp/mission-report.json
+          jq -e '.checkpoint.relevant_files | length == 3' /tmp/mission-report.json
+          jq -e '.checkpoint.log_excerpts | length == 2' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.retrieval_sufficient == true' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.retrieval_summary | length > 100' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.retrieval_citations | length == 3' /tmp/mission-report.json
+
+          # Ranked root-cause analysis and confidence.
+          jq -e '.checkpoint.hypotheses | length == 3' /tmp/mission-report.json
+          jq -e '.checkpoint.hypotheses[0].id == "H1"' /tmp/mission-report.json
+          jq -e '.checkpoint.hypotheses[0].confidence >= 0.9' /tmp/mission-report.json
+          jq -e '.checkpoint.hypotheses[0].evidence | length >= 3' /tmp/mission-report.json
+          jq -e '.checkpoint.hypotheses[1].confidence < .checkpoint.hypotheses[0].confidence' /tmp/mission-report.json
+          jq -e '.checkpoint.hypotheses[2].confidence < .checkpoint.hypotheses[1].confidence' /tmp/mission-report.json
+
+          # Verification, patch, tests, review, and risks.
+          jq -e '.checkpoint.scratchpad.verification.confirmed == true' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.verification.passed == true' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.verification.confidence >= 0.9' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.verification.findings | length >= 3' /tmp/mission-report.json
+          jq -e '.checkpoint.proposed_patch | contains("pool_size=15")' /tmp/mission-report.json
+          jq -e '.checkpoint.proposed_patch | contains("pool_pre_ping=True")' /tmp/mission-report.json
+          jq -e '.checkpoint.changed_files == ["apps/api/database.py"]' /tmp/mission-report.json
+          jq -e '.checkpoint.sandbox_test_output | contains("25 concurrent checkout requests: 25 passed")' /tmp/mission-report.json
+          jq -e '.checkpoint.test_passed == true' /tmp/mission-report.json
+          jq -e '.checkpoint.security_findings | length >= 1' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.agent_pipeline.confidence >= 0.9' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.agent_pipeline.judge_summary | length > 100' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.agent_pipeline.reviewer_comments | length >= 3' /tmp/mission-report.json
+
+          # Execution outcome and post-action monitoring.
+          jq -e '.checkpoint.pull_request_url | startswith("https://github.com/")' /tmp/mission-report.json
+          jq -e '.checkpoint.pull_request_number == 42' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.monitoring.status == "healthy"' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.monitoring.observations | length >= 3' /tmp/mission-report.json
+          jq -e '.checkpoint.scratchpad.monitoring.rollback_recommended == false' /tmp/mission-report.json
+
+          # Guard against the empty, fabricated report regression.
+          ! grep -q 'No evidence retrieved' /tmp/mission-report.json
+          ! grep -q 'No items recorded' /tmp/mission-report.json
 
           wait "$stream_pid" || true
           grep -q 'state_starting' /tmp/mission-events.txt
           grep -q 'state_changed' /tmp/mission-events.txt
           grep -q 'completed' /tmp/mission-events.txt
 
+          jq -r '
+            "# Generated ForgeOps Mission Report\n",
+            "## Mission\n" + .title,
+            "## Environment\n" + .checkpoint.environment_summary,
+            "## Evidence\n" + (.checkpoint.scratchpad.retrieval_citations | map("- " + .) | join("\n")),
+            "## Root cause — " + ((.checkpoint.hypotheses[0].confidence * 100) | round | tostring) + "% confidence\n" + .checkpoint.hypotheses[0].description,
+            "## Verification\n" + .checkpoint.scratchpad.verification.summary,
+            "## Patch\n```diff\n" + .checkpoint.proposed_patch + "\n```",
+            "## Monitoring\n" + (.checkpoint.scratchpad.monitoring.observations | map("- " + .) | join("\n"))
+          ' /tmp/mission-report.json > /tmp/mission-report.md
+
+          echo '----- GENERATED REPORT -----'
+          cat /tmp/mission-report.md
+          echo '----- END GENERATED REPORT -----'
+
+      - name: Upload generated mission evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-mission-report
+          path: |
+            /tmp/mission-report.json
+            /tmp/mission-report.md
+            /tmp/mission-events.txt
+          retention-days: 7
+
       - name: Show diagnostics on failure
         if: failure()
         run: |
           docker compose ps
           docker compose logs --no-color api redis postgres
+          test ! -f /tmp/mission-report.json || cat /tmp/mission-report.json
           test ! -f /tmp/mission-events.txt || cat /tmp/mission-events.txt
 
       - name: Stop services
