@@ -98,16 +98,11 @@ async def create_mission(
 ) -> MissionDetail:
     """Create a mission using the selected provider/model and enqueue it."""
     settings = get_settings()
-    provider_id = (
-        body.llm_provider or settings.default_llm_provider
-    ).strip().lower()
+    provider_id = (body.llm_provider or settings.default_llm_provider).strip().lower()
     model_id = (body.llm_model or settings.default_llm_model).strip()
 
     catalog = await list_model_providers()
-    provider = next(
-        (entry for entry in catalog.providers if entry.id == provider_id),
-        None,
-    )
+    provider = next((entry for entry in catalog.providers if entry.id == provider_id), None)
     if provider is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -213,11 +208,16 @@ async def _get_or_404(db: AsyncSession, mission_id: uuid.UUID) -> Mission:
 
 
 async def _run_mission(mission_id: uuid.UUID) -> None:
-    """Background task: run the agent runtime for a mission."""
+    """Run the agent and publish every state event to the mission SSE channel."""
     from forgeops.agent.runtime import AgentRuntime
+    from forgeops.api.routes.sse import publish_event
     from forgeops.db import get_session_factory
 
     async with get_session_factory()() as db:
         runtime = AgentRuntime(db, mission_id)
-        async for _event in runtime.run():
-            pass
+        async for event in runtime.run():
+            event_type = str(event.get("type", "state_changed"))
+            event_data = event.get("data", {})
+            if not isinstance(event_data, dict):
+                event_data = {"value": event_data}
+            await publish_event(mission_id, event_type, event_data)
