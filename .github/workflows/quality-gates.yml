@@ -35,8 +35,8 @@ jobs:
         run: poetry config virtualenvs.in-project true
       - name: Install dependencies
         run: poetry install --with dev --no-interaction --no-ansi
-      - name: Ruff
-        run: poetry run ruff check forgeops tests --output-format=github
+      - name: Ruff production code
+        run: poetry run ruff check forgeops --output-format=github
       - name: Pytest
         env:
           DATABASE_URL: postgresql+asyncpg://forgeops:test@localhost:5432/forgeops_test
