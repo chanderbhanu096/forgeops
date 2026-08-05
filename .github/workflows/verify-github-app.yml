@@ -1,0 +1,135 @@
+name: Verify GitHub App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-github-app.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Authenticate and inspect installed repositories
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate required secrets
+        env:
+          APP_ID: ${{ secrets.FORGEOPS_GITHUB_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.FORGEOPS_GITHUB_APP_PRIVATE_KEY }}
+          INSTALLATION_ID: ${{ secrets.FORGEOPS_GITHUB_INSTALLATION_ID }}
+          MCP_SECRET: ${{ secrets.MCP_SECRET }}
+        run: |
+          missing=0
+          for name in APP_ID PRIVATE_KEY INSTALLATION_ID MCP_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Install verification dependencies
+        run: python -m pip install --disable-pip-version-check --quiet "PyJWT[crypto]==2.10.1" requests==2.32.5
+
+      - name: Verify installation access
+        env:
+          APP_ID: ${{ secrets.FORGEOPS_GITHUB_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.FORGEOPS_GITHUB_APP_PRIVATE_KEY }}
+          INSTALLATION_ID: ${{ secrets.FORGEOPS_GITHUB_INSTALLATION_ID }}
+          EXPECTED_REPOSITORY: chanderbhanu096/forgeops
+        run: |
+          python - <<'PY'
+          import base64
+          import os
+          import sys
+          import time
+
+          import jwt
+          import requests
+
+          app_id = os.environ["APP_ID"].strip()
+          private_key = os.environ["PRIVATE_KEY"].replace("\\n", "\n").strip()
+          installation_id = os.environ["INSTALLATION_ID"].strip()
+          expected_repository = os.environ["EXPECTED_REPOSITORY"].lower()
+
+          now = int(time.time())
+          app_jwt = jwt.encode(
+              {"iat": now - 60, "exp": now + 540, "iss": app_id},
+              private_key,
+              algorithm="RS256",
+          )
+
+          common_headers = {
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+          app_headers = {**common_headers, "Authorization": f"Bearer {app_jwt}"}
+
+          token_response = requests.post(
+              f"https://api.github.com/app/installations/{installation_id}/access_tokens",
+              headers=app_headers,
+              timeout=30,
+          )
+          if token_response.status_code != 201:
+              print(
+                  "::error::GitHub App authentication failed "
+                  f"with HTTP {token_response.status_code}: "
+                  f"{token_response.json().get('message', 'unknown error')}"
+              )
+              sys.exit(1)
+
+          installation_token = token_response.json()["token"]
+          installation_headers = {
+              **common_headers,
+              "Authorization": f"Bearer {installation_token}",
+          }
+
+          repositories_response = requests.get(
+              "https://api.github.com/installation/repositories?per_page=100",
+              headers=installation_headers,
+              timeout=30,
+          )
+          repositories_response.raise_for_status()
+          repositories = repositories_response.json().get("repositories", [])
+          names = sorted(repo["full_name"] for repo in repositories)
+
+          print(f"GitHub App authentication succeeded.")
+          print(f"Accessible repositories: {len(names)}")
+          for name in names[:20]:
+              print(f"- {name}")
+          if len(names) > 20:
+              print(f"- ... and {len(names) - 20} more")
+
+          if expected_repository not in {name.lower() for name in names}:
+              print(
+                  f"::error::{expected_repository} is not available to this installation. "
+                  "Install the app on all repositories or explicitly select ForgeOps."
+              )
+              sys.exit(1)
+
+          readme_response = requests.get(
+              f"https://api.github.com/repos/{expected_repository}/contents/README.md",
+              headers=installation_headers,
+              timeout=30,
+          )
+          if readme_response.status_code != 200:
+              print(
+                  "::error::The app can see the repository but cannot read its contents. "
+                  "Set Repository permissions → Contents to Read-only."
+              )
+              sys.exit(1)
+
+          encoded = readme_response.json().get("content", "")
+          decoded = base64.b64decode(encoded).decode("utf-8", errors="replace")
+          if "ForgeOps" not in decoded:
+              print("::error::README.md was read but did not contain the expected project marker")
+              sys.exit(1)
+
+          print("Repository content read succeeded.")
+          print("GitHub App configuration is valid for read-only repository analysis.")
+          PY
