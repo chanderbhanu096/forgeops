@@ -1,0 +1,87 @@
+name: Production Quality Gates
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  backend:
+    name: Backend lint, tests and coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Poetry
+        run: pip install poetry==1.8.3
+      - name: Configure Poetry
+        run: poetry config virtualenvs.in-project true
+      - name: Install dependencies
+        run: poetry install --with dev --no-interaction --no-ansi
+      - name: Ruff
+        run: poetry run ruff check forgeops tests --output-format=github
+      - name: Pytest
+        env:
+          DATABASE_URL: postgresql+asyncpg://forgeops:test@localhost:5432/forgeops_test
+          REDIS_URL: redis://localhost:6379
+          OPENAI_API_KEY: sk-test-placeholder
+          ENVIRONMENT: development
+          PYTHONPATH: .
+        run: poetry run pytest tests/ -v --tb=short --cov=forgeops --cov-report=term-missing --cov-report=xml
+
+  frontend:
+    name: Frontend lint, types and production build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run type-check
+      - name: Production build
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+          NEXT_PUBLIC_WS_URL: ws://127.0.0.1:8000
+        run: npm run build
+
+  compose:
+    name: Deterministic Docker Compose build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build all images
+        env:
+          DOCKER_BUILDKIT: "1"
+          COMPOSE_DOCKER_CLI_BUILD: "1"
+        run: docker compose build --pull
