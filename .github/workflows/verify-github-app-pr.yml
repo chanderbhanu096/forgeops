@@ -1,0 +1,99 @@
+name: Verify GitHub App PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify installed repository access
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check --quiet "PyJWT[crypto]==2.10.1" requests==2.32.5
+
+      - name: Authenticate and read ForgeOps
+        env:
+          APP_ID: ${{ secrets.FORGEOPS_GITHUB_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.FORGEOPS_GITHUB_APP_PRIVATE_KEY }}
+          INSTALLATION_ID: ${{ secrets.FORGEOPS_GITHUB_INSTALLATION_ID }}
+          MCP_SECRET: ${{ secrets.MCP_SECRET }}
+        run: |
+          python - <<'PY'
+          import base64
+          import os
+          import sys
+          import time
+          import jwt
+          import requests
+
+          required = ["APP_ID", "PRIVATE_KEY", "INSTALLATION_ID", "MCP_SECRET"]
+          missing = [name for name in required if not os.getenv(name)]
+          if missing:
+              print(f"::error::Missing repository secrets: {', '.join(missing)}")
+              sys.exit(1)
+
+          key = os.environ["PRIVATE_KEY"].replace("\\n", "\n").strip()
+          now = int(time.time())
+          signed = jwt.encode(
+              {"iat": now - 60, "exp": now + 540, "iss": os.environ["APP_ID"].strip()},
+              key,
+              algorithm="RS256",
+          )
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "Authorization": f"Bearer {signed}",
+          }
+          response = requests.post(
+              "https://api.github.com/app/installations/"
+              f"{os.environ['INSTALLATION_ID'].strip()}/access_tokens",
+              headers=headers,
+              timeout=30,
+          )
+          if response.status_code != 201:
+              message = response.json().get("message", "unknown error")
+              print(f"::error::Installation-token request failed: HTTP {response.status_code}: {message}")
+              sys.exit(1)
+
+          token_headers = {
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "Authorization": f"Bearer {response.json()['token']}",
+          }
+          repos_response = requests.get(
+              "https://api.github.com/installation/repositories?per_page=100",
+              headers=token_headers,
+              timeout=30,
+          )
+          repos_response.raise_for_status()
+          repos = sorted(r["full_name"] for r in repos_response.json().get("repositories", []))
+          print(f"Authentication succeeded. Accessible repositories: {len(repos)}")
+          for repo in repos[:20]:
+              print(f"- {repo}")
+
+          expected = "chanderbhanu096/forgeops"
+          if expected.lower() not in {repo.lower() for repo in repos}:
+              print(f"::error::{expected} is not included in the GitHub App installation")
+              sys.exit(1)
+
+          readme = requests.get(
+              f"https://api.github.com/repos/{expected}/contents/README.md",
+              headers=token_headers,
+              timeout=30,
+          )
+          if readme.status_code != 200:
+              print("::error::Repository is visible, but Contents: Read-only is not working")
+              sys.exit(1)
+          text = base64.b64decode(readme.json().get("content", "")).decode("utf-8", "replace")
+          if "ForgeOps" not in text:
+              print("::error::README was returned but expected ForgeOps marker was absent")
+              sys.exit(1)
+
+          print("README.md read succeeded through a short-lived installation token.")
+          print("GitHub App credentials and read permissions are valid.")
+          PY
