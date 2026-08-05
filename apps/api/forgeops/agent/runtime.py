@@ -13,6 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from forgeops.agent.context import MissionContext
 from forgeops.agent.demo_scenario import demo_state_update
+from forgeops.agent.evidence_policy import (
+    validate_repository_target,
+    validate_retrieved_evidence,
+)
 from forgeops.agent.handlers import (
     handle_environment_discovery,
     handle_evidence_collection,
@@ -38,10 +42,7 @@ TRANSITIONS: dict[AgentState | None, list[AgentState]] = {
     AgentState.environment_discovery: [AgentState.plan_generation, AgentState.failed],
     AgentState.plan_generation: [AgentState.evidence_collection, AgentState.failed],
     AgentState.evidence_collection: [AgentState.hypothesis_creation, AgentState.failed],
-    AgentState.hypothesis_creation: [
-        AgentState.hypothesis_verification,
-        AgentState.failed,
-    ],
+    AgentState.hypothesis_creation: [AgentState.hypothesis_verification, AgentState.failed],
     AgentState.hypothesis_verification: [
         AgentState.solution_generation,
         AgentState.evidence_collection,
@@ -185,6 +186,7 @@ class AgentRuntime:
                             timeout=self._settings.default_max_duration_seconds,
                         )
                         ctx.update(result)
+                    self._enforce_evidence_gates(next_state, ctx)
 
                 await self._transition(mission, next_state, ctx)
                 await self._record_step(mission, ctx.last_cost_usd)
@@ -214,6 +216,17 @@ class AgentRuntime:
             "completed" if mission.current_state == AgentState.completed else "failed",
             {"state": str(mission.current_state)},
         )
+
+    @staticmethod
+    def _enforce_evidence_gates(state: AgentState, ctx: MissionContext) -> None:
+        if state == AgentState.environment_discovery:
+            result = validate_repository_target(ctx)
+        elif state == AgentState.evidence_collection:
+            result = validate_retrieved_evidence(ctx)
+        else:
+            return
+        if not result.allowed:
+            raise RuntimeError(result.reason or "Evidence validation failed")
 
     async def resume_after_approval(self) -> AsyncGenerator[dict[str, Any], None]:
         """Resume from the approval gate without skipping the execution handler."""
@@ -300,6 +313,7 @@ class AgentRuntime:
                 current_state=AgentState.failed,
                 status=MissionStatus.failed,
                 error=reason,
+                checkpoint=ctx.to_checkpoint(),
             )
         )
         await self._db.commit()
