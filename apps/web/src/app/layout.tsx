@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./enterprise.css";
 
 export const metadata: Metadata = {
   title: "ForgeOps — Mission Control",
@@ -20,7 +21,7 @@ export default function RootLayout({
               <span className="logo-forge">Forge</span>
               <span className="logo-ops">Ops</span>
             </a>
-            <nav className="nav">
+            <nav className="nav" aria-label="Primary navigation">
               <a href="/" className="nav-link">Missions</a>
               <a href="/approvals" className="nav-link">Approvals</a>
               <a href="/skills" className="nav-link">Skills</a>
