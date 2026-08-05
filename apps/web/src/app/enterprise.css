@@ -1,0 +1,240 @@
+/* Enterprise interaction, accessibility and responsive refinements. */
+
+html {
+  color-scheme: light dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input,
+textarea,
+select,
+summary {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  outline-offset: 3px;
+}
+
+.btn {
+  min-height: 36px;
+  transition: background-color 160ms ease, border-color 160ms ease,
+    box-shadow 160ms ease, transform 160ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgb(15 23 42 / 8%);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+.card,
+.cmd-panel,
+.empty-state {
+  box-shadow: 0 8px 24px rgb(15 23 42 / 4%);
+}
+
+.card {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.card section {
+  min-width: 0;
+}
+
+.card section + section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.diff {
+  background: #0b1220;
+  border-color: #273244;
+  color: #dbeafe;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+  tab-size: 2;
+}
+
+.diff-line {
+  min-width: max-content;
+  white-space: pre;
+}
+
+.diff-line.add {
+  background: #12351f;
+  color: #bbf7d0;
+}
+
+.diff-line.del {
+  background: #451a1a;
+  color: #fecaca;
+}
+
+.diff-line.meta {
+  background: #172554;
+  color: #bfdbfe;
+}
+
+pre.mono {
+  overflow: auto;
+  border-radius: 6px;
+  background: #0b1220;
+  color: #dbeafe;
+  padding: 14px;
+}
+
+.exec-indicator.active {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: forgeops-pulse 1.8s ease-in-out infinite;
+}
+
+.progress-fill {
+  transition: width 320ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.muted {
+  line-height: 1.55;
+}
+
+@keyframes forgeops-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 5%, transparent); }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1020;
+    --surface: #111827;
+    --border: #2b3548;
+    --text: #e5edf8;
+    --muted: #a6b3c5;
+    --accent: #60a5fa;
+    --accent-bg: #172554;
+    --accent-border: #31558f;
+    --green: #4ade80;
+    --red: #f87171;
+    --orange: #fbbf24;
+  }
+
+  .header {
+    background: rgb(11 16 32 / 90%);
+    backdrop-filter: blur(16px);
+  }
+
+  .btn {
+    background: #151d2d;
+  }
+
+  .btn-primary,
+  .btn-danger,
+  .btn-success {
+    color: #07111f;
+  }
+
+  th,
+  tr:hover td {
+    background: #151d2d;
+  }
+
+  .badge-completed {
+    background: #12351f;
+    border-color: #28643d;
+    color: #bbf7d0;
+  }
+
+  .badge-failed {
+    background: #451a1a;
+    border-color: #7f1d1d;
+    color: #fecaca;
+  }
+
+  .badge-running,
+  .badge-paused {
+    background: #422006;
+    border-color: #854d0e;
+    color: #fde68a;
+  }
+}
+
+@media (max-width: 760px) {
+  .header-inner {
+    height: auto;
+    min-height: 56px;
+    padding: 10px 16px;
+    gap: 14px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nav {
+    width: 100%;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .nav-link {
+    flex: 0 0 auto;
+    padding: 5px 8px;
+    border-radius: 5px;
+    background: var(--surface);
+  }
+
+  .main {
+    padding: 22px 14px 48px;
+  }
+
+  .page-header > div:first-child {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .page-header > div:first-child > div:last-child {
+    flex-wrap: wrap;
+  }
+
+  .card,
+  .cmd-left,
+  .cmd-right {
+    padding: 16px;
+  }
+
+  .cmd-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
