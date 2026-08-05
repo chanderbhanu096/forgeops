@@ -32,6 +32,8 @@ pydantic = "^2.10"
 pydantic-settings = "^2.7"
 httpx = "^0.28"
 anyio = "^4.7"
+pyjwt = { version = "^2.10", extras = ["crypto"] }
+cryptography = "^44.0"
 
 # Retrieval
 rank-bm25 = "^0.2"
