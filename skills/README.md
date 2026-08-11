@@ -1,84 +1,95 @@
-# General-Purpose LLM Skills
+# Advanced General-Purpose LLM Skill Library
 
-This directory is a model-agnostic skill library for agents and LLM workflows. Each skill lives in its own folder as `skills/<name>/SKILL.md`.
+This directory contains **50 project-independent domain skills** plus a layered execution framework for Claude-style, Codex-style, Gemini-style, or custom tool-using agents.
 
-## Loading rule
+The original version treated each `SKILL.md` as a standalone prompt fragment. Version 2 treats the library as a **capability graph with inherited execution protocols**. That makes the skills substantially more rigorous without copying the same reliability boilerplate into every file and wasting context tokens.
 
-Do not load all skills by default. First classify the task, then load only the 1-3 skills that materially help. Prefer `context-router` when unsure. Use `context-compact` or `handover` before context grows too large.
+## Architecture
 
-## Routing index
+A skill invocation is composed from three layers:
 
-### Context & token efficiency
-- `context-compact`
-- `handover`
-- `prompt-optimizer`
-- `context-router`
-- `token-budget`
-- `response-compressor`
-- `progressive-disclosure`
-- `retrieval-first`
-- `tool-call-planner`
-- `stop-condition`
+```text
+skills/SKILL.md                     router
+        ↓
+skills/_shared/CORE.md              universal execution discipline
+        ↓
+skills/_shared/<CATEGORY>.md        domain-family protocol
+        ↓
+skills/<skill-name>/SKILL.md        specialized method
+```
 
-### Thinking & planning
-- `brainstorm`
-- `idea-evaluator`
-- `problem-framing`
-- `requirements-clarifier`
-- `task-decomposer`
-- `execution-plan`
-- `project-kickoff`
-- `decision-record`
-- `assumption-audit`
-- `risk-register`
+The router should normally load **one primary skill** and **zero to two companions**.
 
-### Research & knowledge
-- `research-plan`
-- `source-synthesizer`
-- `fact-check`
-- `summarizer`
-- `structured-extractor`
-- `experiment-design`
-- `retrospective`
-- `learning-mode`
+## What the shared core adds
 
-### Engineering
-- `codebase-orient`
-- `debug`
-- `root-cause-analysis`
-- `minimal-fix`
-- `refactor-safely`
-- `code-review`
-- `test-strategy`
-- `test-failure-triage`
-- `ci-debug`
-- `dependency-audit`
-- `api-design`
-- `system-design`
-- `architecture-tradeoffs`
-- `data-modeling`
+Every routed skill inherits:
 
-### Quality, safety & delivery
-- `security-review`
-- `threat-model`
-- `performance-analysis`
-- `observability-plan`
-- `documentation-writer`
-- `release-readiness`
-- `git-commit`
-- `pull-request`
+- explicit Orient → Hypothesize → Act → Verify → Compact state transitions;
+- observed / derived / inferred / unknown evidence states;
+- confidence handling and contradiction rules;
+- information-gain checks before retrieval or tool calls;
+- read / compute / write / verify tool sequencing;
+- an assumption ledger for high-impact uncertainty;
+- reversible-decision heuristics;
+- failure classification and bounded retry behavior;
+- token/context economics;
+- output validation;
+- stop and escalation conditions;
+- safety and external-write boundaries.
 
-## Composition examples
+## Category protocols
 
-- Long task getting expensive: `context-router` -> `token-budget` -> `context-compact`
-- Start a new idea: `brainstorm` -> `idea-evaluator` -> `project-kickoff`
-- Ambiguous request: `problem-framing` -> `requirements-clarifier` -> `task-decomposer`
-- Research: `research-plan` -> `retrieval-first` -> `source-synthesizer` -> `fact-check`
-- Bug fix: `codebase-orient` -> `debug` -> `minimal-fix` -> `test-strategy`
-- Design work: `requirements-clarifier` -> `system-design` -> `architecture-tradeoffs` -> `threat-model`
-- Release: `code-review` -> `security-review` -> `release-readiness` -> `git-commit` -> `pull-request`
-- Session boundary: `context-compact` -> `handover`
+`_shared/CONTEXT.md` handles compression, retrieval economics, prompt density, and handoff quality.
 
-## Skill design principles
+`_shared/THINKING.md` handles divergence/convergence, problem framing, planning boundaries, reversibility, and risk quality.
 
-Skills should be narrow, reusable, evidence-oriented, and cheap to load. A skill should define when it applies, a short workflow, an output contract, and guardrails. Project-specific knowledge belongs in project documentation or project-local skills, not in this general-purpose library.
+`_shared/RESEARCH.md` handles claim-first research, source weighting, contradictions, structured extraction, and experiment discipline.
+
+`_shared/ENGINEERING.md` handles codebase orientation, debugging loops, invariants, test economics, refactoring, and review severity.
+
+`_shared/DELIVERY.md` handles security, performance, observability, documentation correctness, release gates, and Git delivery.
+
+## Skill groups
+
+### Context and token efficiency
+
+`context-compact`, `handover`, `prompt-optimizer`, `context-router`, `token-budget`, `response-compressor`, `progressive-disclosure`, `retrieval-first`, `tool-call-planner`, `stop-condition`
+
+### Thinking and planning
+
+`brainstorm`, `idea-evaluator`, `problem-framing`, `requirements-clarifier`, `task-decomposer`, `execution-plan`, `project-kickoff`, `decision-record`, `assumption-audit`, `risk-register`
+
+### Research and knowledge
+
+`research-plan`, `source-synthesizer`, `fact-check`, `summarizer`, `structured-extractor`, `experiment-design`, `retrospective`, `learning-mode`
+
+### Engineering and architecture
+
+`codebase-orient`, `debug`, `root-cause-analysis`, `minimal-fix`, `refactor-safely`, `code-review`, `test-strategy`, `test-failure-triage`, `ci-debug`, `dependency-audit`, `api-design`, `system-design`, `architecture-tradeoffs`, `data-modeling`
+
+### Quality, security, operations, and delivery
+
+`security-review`, `threat-model`, `performance-analysis`, `observability-plan`, `documentation-writer`, `release-readiness`, `git-commit`, `pull-request`
+
+## Skill maturity standard
+
+A mature domain skill should define:
+
+1. a narrow mission;
+2. trigger and anti-trigger conditions;
+3. minimum inputs;
+4. a repeatable operating protocol;
+5. domain heuristics that change decisions;
+6. known failure modes;
+7. an output contract;
+8. token/context discipline where domain-specific;
+9. stop/escalation rules;
+10. useful composition edges to other skills.
+
+Shared execution behavior belongs in `_shared/` instead of being duplicated everywhere.
+
+## Design principle
+
+**Sophistication should increase decision quality, not prompt length.**
+
+A long skill that repeats generic instructions is worse than a concise domain skill composed with a strong inherited protocol. The library is optimized for selective loading, phase transitions, and low context duplication.
