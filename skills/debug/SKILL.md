@@ -1,27 +1,36 @@
 ---
 name: debug
-description: Diagnose a defect systematically using evidence rather than trial-and-error edits.
+description: Find the cause of a failure by narrowing it with reproducible evidence.
 ---
 
-# debug
+# Debug
 
-## When to use
+Start with the failure you can actually observe.
 
-Use when behavior differs from expectations.
+If it cannot be reproduced, first capture the exact input, environment, error, timing, and state that were present when it happened. Do not jump straight to a fix based on the error message alone.
 
-## Workflow
+## Loop
 
-1. Reproduce or precisely characterize the failure.
-2. Narrow the failing layer using logs, tests, state, and minimal experiments.
-3. Fix the verified cause and add regression coverage where practical.
+```text
+reproduce
+  -> narrow the failing layer
+  -> write one likely explanation
+  -> choose a check that can disprove it
+  -> update the explanation
+```
 
-## Output contract
+Prefer checks that separate two explanations. Adding more logs is useful only when those logs answer a specific question.
 
-Root cause, minimal fix, and validation evidence.
+Once the cause is known, make the smallest change that addresses it. Then rerun the original reproduction before running broader tests.
 
-## Guardrails
+## Common traps
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+- changing several things between runs;
+- assuming the last stack-frame is the root cause;
+- treating a retry that happened to pass as a fix;
+- debugging the local environment when only CI fails, or vice versa;
+- fixing the symptom while the bad state can still be created elsewhere.
+
+Add a regression test when the failure can be captured cheaply and the bug could return unnoticed.
+
+See also: `root-cause-analysis`, `minimal-fix`, `test-strategy`, `ci-debug`.

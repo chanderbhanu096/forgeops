@@ -1,27 +1,33 @@
 ---
 name: code-review
-description: Review a change for correctness, regressions, security, maintainability, and missing tests.
+description: Review a change for concrete defects, regressions, security problems, and missing tests.
 ---
 
-# code-review
+# Code review
 
-## When to use
+Understand what the change is supposed to do before judging how it is written.
 
-Use for pull requests, patches, or pre-merge review.
+Read the surrounding code and tests when the diff alone is not enough to understand the behavior.
 
-## Workflow
+## Review order
 
-1. Understand intended behavior before judging implementation.
-2. Prioritize concrete defects over stylistic preference.
-3. For each finding, explain impact, evidence, and a practical fix.
+1. correctness and edge cases;
+2. security and permission boundaries;
+3. data loss or compatibility risk;
+4. concurrency, retries, and failure handling where relevant;
+5. missing or misleading tests;
+6. maintainability problems that are likely to cause real future mistakes;
+7. style only when the repository has a clear convention or the style affects readability.
 
-## Output contract
+For every finding, be able to answer:
 
-A severity-ranked review with actionable findings.
+- what can go wrong;
+- under which input or state;
+- where the evidence is in the change;
+- how the author could fix or test it.
 
-## Guardrails
+Avoid speculative comments that cannot describe a failure mode. Avoid asking for unrelated cleanup just because the file is already being edited.
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+If no meaningful defects are found, say that instead of manufacturing low-value comments.
+
+See also: `test-strategy`, `security-review`, `pull-request`.

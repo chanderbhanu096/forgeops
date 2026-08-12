@@ -1,67 +1,45 @@
----
-name: thinking-planning-protocol
-scope: category
----
+# Planning and decision notes
 
-# Thinking & Planning Protocol
+Use these notes for brainstorming, requirements, planning, assumptions, and trade-offs.
 
-Applies to: `brainstorm`, `idea-evaluator`, `problem-framing`, `requirements-clarifier`, `task-decomposer`, `execution-plan`, `project-kickoff`, `decision-record`, `assumption-audit`, `risk-register`.
+## Separate exploration from selection
 
-## Objective
+When the solution is not known yet, generate genuinely different options first. Do not make ten variations of the same idea and call that breadth.
 
-Turn ambiguity into a decision or executable plan without prematurely locking onto a solution.
+Once there are enough options, switch modes and compare them using the constraints that actually matter.
 
-## Diverge before converge
+## Frame the problem before optimizing it
 
-During exploration, deliberately vary mechanism, audience, scope, constraints, and implementation model. Do not evaluate every idea as soon as it appears; premature evaluation collapses diversity.
+Write down the decision, the affected user or system, the constraints, and the evidence that would change the answer.
 
-During convergence, use explicit decision drivers. Separate:
+A good problem statement is usually narrower than the first request. Avoid solving adjacent problems unless they are required for the main one.
 
-- must-have constraints;
-- weighted preferences;
-- uncertain assumptions;
-- irreversible consequences;
-- reversible experiments.
+## Requirements
 
-## Problem framing test
+Separate:
 
-A useful problem statement contains:
+- must-have behavior;
+- useful behavior;
+- explicit non-goals;
+- assumptions;
+- open questions.
 
-- affected actor;
-- current state;
-- desired state;
-- observable gap;
-- scope boundary;
-- measurable success condition.
+Do not turn every preference into a hard requirement.
 
-If it already names the implementation, challenge whether a solution has been smuggled into the problem statement.
+## Trade-offs
 
-## Planning rule
+Compare options using concrete costs such as complexity, latency, reliability, maintenance, security, migration effort, and reversibility.
 
-Decompose work by **dependency and validation boundary**, not by arbitrary file, team, or time slices.
+A choice that is easy to reverse does not need the same amount of analysis as a public API or data model that will be expensive to change later.
 
-Each task should have:
+## Risks
 
-- required input;
-- observable output/state change;
-- completion test;
-- dependency relation;
-- risk or rollback note when relevant.
+A useful risk describes an event, why it could happen, the effect, and what can be done about it.
 
-Front-load tasks that can invalidate the rest of the plan.
+“Performance may be bad” is weak. “The synchronous enrichment call is on the request path and can add the upstream API's p99 latency to every request” is useful.
 
-## Decision reversibility
+## Plans
 
-Prefer reversible options when evidence is weak. Spend more analysis on decisions that are expensive to reverse, externally visible, or likely to constrain future architecture.
+Plans should expose checkpoints and verification, not just a long list of tasks.
 
-## Risk quality
-
-A risk is actionable only when it has:
-
-- event/cause;
-- impact;
-- probability or likelihood class;
-- trigger/detection signal;
-- mitigation;
-- contingency;
-- owner or responsible role.
+Prefer small steps where the result of one step changes what should happen next.

@@ -1,67 +1,42 @@
----
-name: research-knowledge-protocol
-scope: category
----
+# Research notes
 
-# Research & Knowledge Protocol
+Use these notes when the task depends on external sources, documents, claims, or experiments.
 
-Applies to: `research-plan`, `source-synthesizer`, `fact-check`, `summarizer`, `structured-extractor`, `experiment-design`, `retrospective`, `learning-mode`.
+## Start from claims, not from pages
 
-## Objective
+Write down the questions or claims that need evidence. Then look for sources that can answer them.
 
-Produce decision-quality knowledge with traceable evidence, bounded uncertainty, and minimal retrieval waste.
+This avoids collecting a pile of links before deciding what any of them are supposed to prove.
 
-## Claim-first research
+## Prefer the closest source
 
-Break the question into claims or subquestions before searching. For each claim, define the strongest plausible source type and the evidence threshold required to act.
+For a library, use its documentation or source code before a blog post about it. For a paper, use the paper. For a product behavior, use the product documentation or reproducible behavior when possible.
 
-Search for the unknown, not the whole topic.
+Secondary sources are useful for explanation, comparison, and discovering primary material, but they should not silently replace it.
 
-## Source weighting
+## Record disagreement
 
-Evaluate evidence on:
+If reliable sources disagree, do not average the disagreement away. State what each source says and why the difference may exist: version, date, scope, methodology, or a genuine unresolved dispute.
 
-- authority;
-- directness;
-- methodology;
-- recency where relevant;
-- scope match;
-- independence from other sources.
+## Separate extraction from interpretation
 
-Do not count multiple sources as independent corroboration when they repeat the same upstream claim.
+When reading structured data or documents, first record what is there. Interpret it after the relevant facts have been extracted.
 
-## Contradiction handling
+This is especially important when a surprising result conflicts with the working theory.
 
-When sources disagree:
+## Experiments
 
-1. check whether they use different definitions, populations, versions, or time windows;
-2. prefer primary evidence for exact factual questions;
-3. preserve meaningful disagreement rather than averaging it away;
-4. state what additional evidence would resolve the dispute.
+Before running an experiment, state:
 
-## Extraction discipline
+- the question;
+- the expected signal;
+- what changes between conditions;
+- what stays fixed;
+- the success measure;
+- the stopping rule.
 
-For structured extraction:
+A test that changes several things at once is difficult to learn from even if it produces a better result.
 
-- define schema first;
-- distinguish missing from unknown from not-applicable;
-- normalize units and dates explicitly;
-- preserve raw source value when normalization can lose meaning;
-- retain provenance at field or record level for consequential data.
+## Finish with limitations
 
-## Experiment discipline
-
-An experiment must define before execution:
-
-- hypothesis;
-- decision it informs;
-- baseline/control;
-- intervention;
-- primary metric;
-- guardrail metrics;
-- minimum meaningful effect;
-- analysis method;
-- stopping criteria;
-- response to positive, negative, and inconclusive outcomes.
-
-If no plausible result would change a decision, do not run the experiment.
+Include limitations that could change how the result should be used. Do not add a generic “limitations” paragraph just for formality.

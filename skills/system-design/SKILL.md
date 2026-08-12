@@ -1,27 +1,35 @@
 ---
 name: system-design
-description: Design a system from requirements through components, data flow, failure modes, and operations.
+description: Turn requirements and workload assumptions into a design that can be built and operated.
 ---
 
-# system-design
+# System design
 
-## When to use
+Do not start with a diagram. Start with the workload and the promises the system needs to keep.
 
-Use for new systems or significant architectural changes.
+## Establish first
 
-## Workflow
+- who or what uses the system;
+- main reads and writes;
+- expected scale and traffic shape;
+- latency and availability expectations;
+- consistency requirements;
+- data retention and privacy constraints;
+- which failures are acceptable;
+- what the team can realistically operate.
 
-1. Start from functional and non-functional requirements.
-2. Define components, interfaces, data ownership, scaling assumptions, and trust boundaries.
-3. Cover failure handling, observability, security, deployment, and tradeoffs.
+Then choose components.
 
-## Output contract
+## Work from the request path outward
 
-A system design with explicit assumptions and tradeoffs.
+Trace how a normal request enters, where state lives, which external systems are called, and what happens when each dependency is slow or unavailable.
 
-## Guardrails
+Consider caching, queues, partitioning, replication, and asynchronous work only when a requirement creates the need. Do not add them because they are common in architecture diagrams.
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+Call out irreversible choices such as public APIs, data models, sharding keys, and cross-service ownership boundaries.
+
+For important design decisions, include the simpler alternative and explain why it is not enough.
+
+Finish with failure handling, observability, rollout, and the first capacity limit likely to be hit.
+
+See also: `requirements-clarifier`, `architecture-tradeoffs`, `data-modeling`, `threat-model`.

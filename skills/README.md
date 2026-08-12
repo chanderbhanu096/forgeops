@@ -1,95 +1,79 @@
-# Advanced General-Purpose LLM Skill Library
+# Skills
 
-This directory contains **50 project-independent domain skills** plus a layered execution framework for Claude-style, Codex-style, Gemini-style, or custom tool-using agents.
+This directory is a collection of reusable working notes for common agent tasks.
 
-The original version treated each `SKILL.md` as a standalone prompt fragment. Version 2 treats the library as a **capability graph with inherited execution protocols**. That makes the skills substantially more rigorous without copying the same reliability boilerplate into every file and wasting context tokens.
+They started as a way to avoid rewriting the same instructions for debugging, code review, research, planning, and context cleanup in every prompt. The files are intentionally small enough to load only when they are useful.
 
-## Architecture
+## How to use them
 
-A skill invocation is composed from three layers:
+Start with [`SKILL.md`](SKILL.md). It acts as a simple router.
+
+In most cases one skill is enough. Add a second or third only when it handles a different part of the task. Loading the whole directory usually makes the prompt worse, not better.
+
+For example:
 
 ```text
-skills/SKILL.md                     router
-        ↓
-skills/_shared/CORE.md              universal execution discipline
-        ↓
-skills/_shared/<CATEGORY>.md        domain-family protocol
-        ↓
-skills/<skill-name>/SKILL.md        specialized method
+bug report
+  -> codebase-orient
+  -> debug
+  -> minimal-fix
+  -> test-strategy
 ```
 
-The router should normally load **one primary skill** and **zero to two companions**.
+or:
 
-## What the shared core adds
+```text
+long session
+  -> context-compact
+  -> handover
+```
 
-Every routed skill inherits:
+The arrows do not mean every step is mandatory. Stop once the requested work is done.
 
-- explicit Orient → Hypothesize → Act → Verify → Compact state transitions;
-- observed / derived / inferred / unknown evidence states;
-- confidence handling and contradiction rules;
-- information-gain checks before retrieval or tool calls;
-- read / compute / write / verify tool sequencing;
-- an assumption ledger for high-impact uncertainty;
-- reversible-decision heuristics;
-- failure classification and bounded retry behavior;
-- token/context economics;
-- output validation;
-- stop and escalation conditions;
-- safety and external-write boundaries.
+## Shared notes
 
-## Category protocols
+The `_shared/` files hold rules that would otherwise be copied into many skills:
 
-`_shared/CONTEXT.md` handles compression, retrieval economics, prompt density, and handoff quality.
+- `CORE.md` - evidence, tool use, retries, and verification
+- `CONTEXT.md` - context size, retrieval, and handoff
+- `THINKING.md` - framing, options, decisions, and risk
+- `RESEARCH.md` - sources, claims, contradictions, and experiments
+- `ENGINEERING.md` - debugging, tests, refactors, and review
+- `DELIVERY.md` - security, releases, documentation, and repository writes
 
-`_shared/THINKING.md` handles divergence/convergence, problem framing, planning boundaries, reversibility, and risk quality.
-
-`_shared/RESEARCH.md` handles claim-first research, source weighting, contradictions, structured extraction, and experiment discipline.
-
-`_shared/ENGINEERING.md` handles codebase orientation, debugging loops, invariants, test economics, refactoring, and review severity.
-
-`_shared/DELIVERY.md` handles security, performance, observability, documentation correctness, release gates, and Git delivery.
+These files are not meant to turn the skills into a formal framework. They are just common conventions.
 
 ## Skill groups
 
-### Context and token efficiency
+Context and prompt work:
 
 `context-compact`, `handover`, `prompt-optimizer`, `context-router`, `token-budget`, `response-compressor`, `progressive-disclosure`, `retrieval-first`, `tool-call-planner`, `stop-condition`
 
-### Thinking and planning
+Planning and decisions:
 
 `brainstorm`, `idea-evaluator`, `problem-framing`, `requirements-clarifier`, `task-decomposer`, `execution-plan`, `project-kickoff`, `decision-record`, `assumption-audit`, `risk-register`
 
-### Research and knowledge
+Research:
 
 `research-plan`, `source-synthesizer`, `fact-check`, `summarizer`, `structured-extractor`, `experiment-design`, `retrospective`, `learning-mode`
 
-### Engineering and architecture
+Engineering:
 
 `codebase-orient`, `debug`, `root-cause-analysis`, `minimal-fix`, `refactor-safely`, `code-review`, `test-strategy`, `test-failure-triage`, `ci-debug`, `dependency-audit`, `api-design`, `system-design`, `architecture-tradeoffs`, `data-modeling`
 
-### Quality, security, operations, and delivery
+Delivery and operations:
 
 `security-review`, `threat-model`, `performance-analysis`, `observability-plan`, `documentation-writer`, `release-readiness`, `git-commit`, `pull-request`
 
-## Skill maturity standard
+## Writing a new skill
 
-A mature domain skill should define:
+A useful skill should answer a few practical questions:
 
-1. a narrow mission;
-2. trigger and anti-trigger conditions;
-3. minimum inputs;
-4. a repeatable operating protocol;
-5. domain heuristics that change decisions;
-6. known failure modes;
-7. an output contract;
-8. token/context discipline where domain-specific;
-9. stop/escalation rules;
-10. useful composition edges to other skills.
+- When is this file worth loading?
+- What information is needed before starting?
+- What order should the work happen in?
+- Which mistakes are common here?
+- What should the result look like?
+- When should the agent stop or ask for help?
 
-Shared execution behavior belongs in `_shared/` instead of being duplicated everywhere.
-
-## Design principle
-
-**Sophistication should increase decision quality, not prompt length.**
-
-A long skill that repeats generic instructions is worse than a concise domain skill composed with a strong inherited protocol. The library is optimized for selective loading, phase transitions, and low context duplication.
+If the file cannot answer those questions, it is probably still a note rather than a reusable skill. That is fine; not every note needs to become a skill.

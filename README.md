@@ -1,62 +1,30 @@
-<div align="center">
+# ForgeOps
 
-# ⚙️ ForgeOps AI
+ForgeOps is a small experiment in using language models for repository investigation without letting the model quietly make things up or change a project on its own.
 
-### An approval-controlled AI engineer for software, data and cloud incidents
+The main use case is a repository review. Give ForgeOps a GitHub repository, let it inspect the code, collect evidence, and produce a report. If a change is needed, that becomes a separate step and should require an explicit approval.
 
-**Investigate → collect evidence → identify root cause → verify a fix → request human approval**
+There is a live demo at:
 
-[![CI / CD](https://github.com/chanderbhanu096/forgeops/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/chanderbhanu096/forgeops/actions/workflows/ci-cd.yml)
-[![Quality Gates](https://github.com/chanderbhanu096/forgeops/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/chanderbhanu096/forgeops/actions/workflows/quality-gates.yml)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://postgresql.org)
+https://forgeops-staging-web.greenrock-70958585.northeurope.azurecontainerapps.io
 
-[**Open the live demo**](https://forgeops-staging-web.greenrock-70958585.northeurope.azurecontainerapps.io) · [Start locally](#start-in-60-seconds) · [Add an LLM](#add-an-llm-provider) · [Architecture](#architecture)
+## What it does
 
-</div>
+A mission usually looks like this:
 
----
+1. identify the repository and revision to inspect;
+2. read the files needed for the question;
+3. keep findings tied to source evidence;
+4. run deterministic checks when they are available;
+5. stop before a write or deployment unless that action has been approved.
 
-## What makes ForgeOps trustworthy
+The project keeps checkpoints in PostgreSQL so a failed mission can be inspected instead of disappearing with the process that ran it.
 
-ForgeOps is designed to stop rather than invent an answer. Repository-review missions must identify a concrete GitHub repository and retrieve cited source evidence before the system can create hypotheses, propose a patch, or claim that verification or monitoring succeeded.
+The current implementation has a FastAPI backend, a Next.js interface, model-provider adapters, GitHub tooling, and a small verification layer around repository work.
 
-When repository access or evidence retrieval fails, the mission ends with a clear error and preserves its checkpoint for inspection.
+## Try it locally
 
-## Production quality gates
-
-Pull requests run all of the following automatically:
-
-- Ruff linting for production Python code
-- Full pytest suite with coverage
-- Next.js ESLint checks
-- TypeScript type checking
-- Next.js production build
-- Docker Compose validation
-- Deterministic image builds for every Compose service
-
-Run the same checks locally:
-
-```bash
-cd apps/api
-poetry install --with dev
-poetry run ruff check forgeops
-poetry run pytest tests/ -v
-
-cd ../web
-npm ci
-npm run lint
-npm run type-check
-npm run build
-
-cd ../..
-docker compose config --quiet
-docker compose build --pull
-```
-
-## Start in 60 seconds
+You need Docker and Docker Compose.
 
 ```bash
 git clone https://github.com/chanderbhanu096/forgeops.git
@@ -67,62 +35,103 @@ docker compose up --build
 
 Open `http://localhost:3000`.
 
-The built-in demo provider works without an external model key. Configure one of the supported providers in `.env` for live model execution.
+The demo provider works without an external model key. Real providers can be configured in `.env`.
 
-## Test a repository review
-
-```text
-Review the repository at https://github.com/OWNER/REPOSITORY.
-Analyze the main branch in read-only mode.
-Show the repository URL, branch or commit, files inspected, and evidence for
-all confirmed findings. Keep assumptions separate. Do not generate a patch or
-claim tests passed unless source evidence and actual test output are available.
-Stop for human review before any change.
-```
-
-## GitHub App access
-
-Use a GitHub App with read-only repository permissions by default. Store credentials only in GitHub Actions or Azure secrets.
+## Example mission
 
 ```text
-FORGEOPS_GITHUB_APP_ID
-FORGEOPS_GITHUB_APP_PRIVATE_KEY
-FORGEOPS_GITHUB_INSTALLATION_ID
-MCP_SECRET
+Review https://github.com/OWNER/REPOSITORY.
+
+Inspect the main branch in read-only mode. Show which files you used for each
+finding and keep assumptions separate from confirmed facts. Do not create a
+patch or claim that tests passed unless those tests were actually run. Stop
+before making a repository change.
 ```
 
-Never commit private keys or long-lived tokens. Write operations should require explicit approval of the exact repository, branch, patch, and pull-request scope.
+This example is intentionally strict. It is useful when testing whether a model is following repository evidence instead of filling in missing details from prior knowledge.
 
-## Architecture
+## Repository layout
 
 ```text
-Next.js Mission Control
-        │
-        ▼
-FastAPI mission API ── PostgreSQL checkpoints
-        │
-        ├── Model providers
-        ├── Retrieval and evidence pipeline
-        ├── Deterministic verification
-        ├── GitHub MCP
-        └── Human approval gate
+apps/api/        FastAPI service and mission logic
+apps/web/        Next.js interface
+services/        supporting services and integrations
+infra/           deployment and infrastructure files
+docs/            longer design and operating notes
+scripts/         local and CI helper scripts
+skills/          reusable instructions for common agent tasks
 ```
 
-## Add an LLM provider
+## Model providers
 
-ForgeOps supports server-side provider configuration through environment variables. The UI never receives secret values.
+Provider configuration stays on the server. The UI only receives provider and model names, not secret values.
 
-Common options include Groq, OpenAI, Anthropic, OpenRouter, Ollama, and custom OpenAI-compatible endpoints. Set the provider key and model list in `.env`, restart the API, and select the provider while creating a mission.
+The code currently supports several provider styles, including OpenAI-compatible endpoints. Check `.env.example` for the variables used by the current version rather than relying on this README for a complete list.
 
-## Safety model
+## GitHub access
 
-- Read-only investigation by default
-- Evidence required before findings
-- Deterministic checks before approval
-- Human approval before execution
-- Durable checkpoints for auditability
-- Secrets kept on the server
+For repository investigation, read-only GitHub permissions are enough and are the preferred starting point.
+
+If write support is enabled, keep that permission separate from ordinary inspection and approve the exact target before using it. In particular, repository, branch, patch, and pull-request scope should be known before a write happens.
+
+GitHub App credentials and model keys belong in local secrets, GitHub Actions secrets, or the deployment platform. Do not put them in the repository.
+
+## Checks
+
+The project uses the same commands locally and in CI.
+
+Backend:
+
+```bash
+cd apps/api
+poetry install --with dev
+poetry run ruff check forgeops
+poetry run pytest tests/ -v
+```
+
+Frontend:
+
+```bash
+cd apps/web
+npm ci
+npm run lint
+npm run type-check
+npm run build
+```
+
+Compose:
+
+```bash
+docker compose config --quiet
+docker compose build --pull
+```
+
+## How repository reviews are handled
+
+The useful part of ForgeOps is less the model call and more the bookkeeping around it.
+
+A repository finding should have a source. A proposed fix should be distinguishable from a confirmed bug. A successful verification should come from an actual command or check. If repository access fails halfway through a mission, the mission should say that instead of finishing a confident report from partial evidence.
+
+That is the behavior the project is trying to make boring and repeatable.
+
+## Skills
+
+`skills/` contains reusable notes for recurring work such as debugging, planning, code review, research, context compaction, and handoff.
+
+They are deliberately loaded on demand. They are not meant to be concatenated into one giant prompt. Start with [`skills/SKILL.md`](skills/SKILL.md), which explains the routing convention.
+
+## Current limitations
+
+ForgeOps is still a project under active development. A few boundaries are worth keeping in mind:
+
+- access to a repository does not mean every external dependency or service can be reproduced locally;
+- model output is not treated as verification;
+- a repository review can still miss a problem if the relevant evidence was never retrieved;
+- provider behavior differs, especially around tool calling and long context;
+- the approval model is only useful if write-capable integrations are configured with appropriately narrow permissions.
+
+These are design constraints rather than problems the prompt alone can solve.
 
 ## License
 
-See the repository license for usage terms.
+See [LICENSE](LICENSE).

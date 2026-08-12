@@ -1,27 +1,33 @@
 ---
 name: test-strategy
-description: Choose the smallest effective set of tests for a change or system.
+description: Choose the smallest useful set of tests for the behavior and risks of a change.
 ---
 
-# test-strategy
+# Test strategy
 
-## When to use
+Start from what could break, not from a generic pyramid.
 
-Use when deciding what to test and at which layer.
+## Pick tests by boundary
 
-## Workflow
+- pure logic: focused unit tests;
+- database or filesystem behavior: integration tests around the real boundary;
+- API contracts: request/response and error-path tests;
+- asynchronous work: ordering, retries, duplication, and idempotency tests;
+- UI changes: component behavior plus one end-to-end path when integration is the risk;
+- bug fixes: reproduce the old failure first when practical.
 
-1. Map risks to unit, integration, contract, end-to-end, and manual checks.
-2. Prefer fast deterministic tests for most behavior and reserve E2E for critical flows.
-3. Include negative paths, boundaries, and failure recovery.
+Use broad suites after focused checks, not instead of them.
 
-## Output contract
+A test is valuable when a realistic regression would make it fail for the right reason.
 
-A risk-based test plan.
+## Watch for
 
-## Guardrails
+- tests that only restate implementation details;
+- mocks that remove the behavior being tested;
+- assertions so weak that the old bug would still pass;
+- flaky timing assumptions;
+- large end-to-end tests for behavior that can be checked deterministically lower down.
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+Stop when the important behavior and failure boundaries are covered well enough for the cost and risk of the change.
+
+See also: `test-failure-triage`, `minimal-fix`, `release-readiness`.

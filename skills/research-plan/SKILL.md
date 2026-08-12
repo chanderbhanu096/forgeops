@@ -1,27 +1,36 @@
 ---
 name: research-plan
-description: Design efficient research before searching broadly.
+description: Turn a broad research request into a small set of questions, sources, and stopping rules.
 ---
 
-# research-plan
+# Research plan
 
-## When to use
+Use this before a research task starts collecting pages faster than it is answering questions.
 
-Use for unfamiliar, niche, or evidence-heavy questions.
+## Start with the claims
 
-## Workflow
+Write down what needs to be known or decided. Split broad questions until each one can reasonably be supported or rejected by evidence.
 
-1. Define the exact questions that need evidence.
-2. Choose primary sources first and define freshness requirements.
-3. Set stopping criteria so research does not expand without purpose.
+For each question, note the best source type:
 
-## Output contract
+- source code or official docs for software behavior;
+- standards or specifications for protocol requirements;
+- papers for research claims;
+- first-party data for product or company facts;
+- high-quality secondary sources for context and comparison.
 
-A focused research plan and evidence checklist.
+## Search order
 
-## Guardrails
+Start with the source closest to the claim. Use secondary sources to discover terminology or primary material, not as a default replacement for it.
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+Record useful contradictions rather than hiding them. A version difference, date, sample, or scope difference often explains why two sources disagree.
+
+## Stop when
+
+- the decision-relevant questions have credible evidence;
+- another source is unlikely to change the answer;
+- the remaining uncertainty is clearly stated.
+
+Do not keep researching just because more search results exist.
+
+See also: `retrieval-first`, `source-synthesizer`, `fact-check`.

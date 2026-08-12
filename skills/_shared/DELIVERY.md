@@ -1,69 +1,41 @@
----
-name: delivery-quality-protocol
-scope: category
----
+# Delivery and operations notes
 
-# Quality, Security, Operations & Delivery Protocol
+Use these notes for security review, performance work, observability, documentation, releases, commits, and pull requests.
 
-Applies to: `security-review`, `threat-model`, `performance-analysis`, `observability-plan`, `documentation-writer`, `release-readiness`, `git-commit`, `pull-request`.
+## Security
 
-## Objective
+Look at trust boundaries and data flow before listing generic vulnerabilities.
 
-Move validated work into use safely, with known risk, observable behavior, and a credible rollback path.
+For each meaningful risk, identify the asset, attacker or failure source, entry point, possible effect, and existing control. Prefer concrete abuse paths over checklist noise.
 
-## Security lens
+## Performance
 
-For exposed or sensitive changes, map:
+Measure before optimizing when measurement is possible.
 
-- assets;
-- principals;
-- entry points;
-- trust boundaries;
-- authentication;
-- authorization;
-- sensitive data flow;
-- secret handling;
-- abuse/resource-exhaustion paths;
-- dependency/supply-chain exposure.
+Separate latency, throughput, memory, CPU, I/O, and external-service time. A slow request can have very different fixes depending on which of those dominates.
 
-Rank findings by exploitability, reachability, impact, and confidence. Prefer remediations that close the vulnerable path and can be regression-tested.
+## Observability
 
-## Performance lens
+Logs and metrics are useful when they help answer an operational question.
 
-Never optimize before measuring a representative workload. Compare distributions, including tail latency when relevant. Control dataset size, cache state, warmup, concurrency, and environment between before/after measurements.
+Start from questions such as “which dependency is failing?”, “which requests are slow?”, or “did this release increase errors?” and add the smallest signal that answers them.
 
-## Observability lens
+## Documentation
 
-Instrument the questions an operator must answer during failure. Alerts require an owner and an action. Prefer symptom/SLO-based alerts to noisy internal anomalies.
+Document what the code actually does. Verify commands, defaults, paths, and examples against the current repository whenever possible.
 
-## Documentation quality
+Do not write feature marketing into setup instructions. If a limitation surprises a user, it probably belongs near the relevant instruction rather than at the bottom of the page.
 
-Documentation is correct only when commands, defaults, paths, configuration, and failure behavior match the current implementation. Include a verification step so readers can confirm success.
+## Releases
 
-## Release gate
+Before release, check the behavior being shipped, migrations, configuration changes, rollback path, and user-visible compatibility.
 
-A release decision should explicitly cover:
+A green build is necessary but does not answer every release question.
 
-- acceptance criteria;
-- test/quality evidence;
-- compatibility and migration;
-- security review where relevant;
-- operational ownership;
-- telemetry and health signals;
-- rollout strategy;
-- abort threshold;
-- rollback mechanism;
-- residual risks.
+## Commits and pull requests
 
-A green test suite alone is not release readiness.
+A commit should contain one understandable change when practical. The message should say what changed, not advertise how important the change is.
 
-## Git delivery
+A pull request should explain the problem, the chosen change, how it was checked, and anything reviewers need to pay special attention to.
 
-Before commit or PR:
-
-- inspect final diff;
-- exclude unrelated user changes;
-- confirm required checks pass;
-- ensure one coherent change story;
-- state motivation/root cause, behavior impact, risks, and validation;
-- verify the resulting commit/branch/PR points to the intended state.
+Do not claim a test, migration, benchmark, or manual check was performed unless it actually was.

@@ -1,27 +1,35 @@
 ---
 name: brainstorm
-description: Generate diverse, useful ideas before converging on a solution.
+description: Generate meaningfully different options before deciding which direction is worth pursuing.
 ---
 
-# brainstorm
+# Brainstorm
 
-## When to use
+Use this when the goal is known but the solution is still open.
 
-Use when the goal is known but the solution space is still open.
+Do not start ranking ideas after the first decent option. First make the option set genuinely different.
 
-## Workflow
+## A practical pass
 
-1. Generate conservative, practical, ambitious, and unconventional directions.
-2. Avoid near-duplicates; vary mechanism, audience, scope, and implementation.
-3. Group ideas and identify the strongest candidates.
+Generate ideas from several angles:
 
-## Output contract
+- simplest thing that could work;
+- reuse something that already exists;
+- automate a manual step;
+- remove a step entirely;
+- change the user or operator workflow instead of the technology;
+- choose a deliberately constrained version;
+- choose a more ambitious version;
+- invert an assumption that everyone is treating as fixed.
 
-A diverse idea set with a small shortlist.
+Then group near-duplicates and keep only the distinct approaches.
 
-## Guardrails
+## When narrowing down
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+Compare the shortlist against the real constraints: time, maintenance, cost, data availability, technical risk, reversibility, and how quickly the idea can be tested.
+
+A good brainstorm does not need 50 ideas. Six different mechanisms are more useful than 30 variations of one mechanism.
+
+If one idea is clearly dominant because of a hard constraint, say so and stop pretending the options are equally good.
+
+See also: `idea-evaluator`, `problem-framing`, `experiment-design`.

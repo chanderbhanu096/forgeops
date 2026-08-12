@@ -1,148 +1,104 @@
----
-name: advanced-skill-core
-version: 2
-scope: inherited
----
+# Common working rules
 
-# Advanced Skill Core Protocol
+These notes apply to most skills in this directory. They are here so the same rules do not have to be repeated in every file.
 
-Every skill in this library inherits this protocol when loaded through `skills/SKILL.md`. Domain skill files define *what expert method to use*; this file defines *how an agent executes that method reliably*.
+## Before doing anything expensive
 
-## 1. Execution state model
+Make sure you know:
 
-Track the task in five explicit states:
+- what the user is asking for;
+- what would count as done;
+- which constraints would change the answer;
+- which facts are known and which are guesses.
 
-1. **Orient** — establish goal, constraints, current state, source-of-truth, and risk.
-2. **Hypothesize** — form the smallest set of plausible explanations/options.
-3. **Act** — perform the narrowest evidence-producing or state-changing step.
-4. **Verify** — compare observed result with acceptance criteria and expected side effects.
-5. **Compact** — preserve only durable conclusions, decisions, blockers, and next actions.
+If a missing fact can be read from the repository, a document, or another authoritative source, look it up instead of asking the user to repeat it.
 
-Do not skip from Orient directly to irreversible action unless the target and success condition are already unambiguous.
+## Keep facts and guesses separate
 
-## 2. Evidence states
+It helps to treat information as one of four things:
 
-Label important claims internally as one of:
+- **observed** - read directly from a source or command output;
+- **derived** - calculated from observed information;
+- **inferred** - a reasonable explanation that has not been confirmed;
+- **unknown** - still missing.
 
-- **Observed**: directly present in user input, source material, tool output, or execution result.
-- **Derived**: follows from observed evidence through a transparent calculation or deterministic rule.
-- **Inferred**: plausible interpretation that still needs validation.
-- **Unknown**: unresolved and potentially decision-relevant.
+Do not quietly promote an inference into a fact because it makes the next step easier.
 
-Never silently promote inferred information to observed fact. If a high-impact decision depends on an inferred or unknown claim, retrieve, test, or explicitly escalate.
+## Use tools in a sensible order
 
-## 3. Confidence protocol
+Prefer read-only work first.
 
-Use confidence qualitatively unless a calibrated numeric score is genuinely useful:
+A common sequence is:
 
-- **High** — multiple consistent signals or direct verification.
-- **Medium** — evidence supports the conclusion but alternatives remain plausible.
-- **Low** — mostly inferred, weakly sourced, or dependent on missing state.
+```text
+inspect -> narrow the question -> run a check -> make a change -> verify the change
+```
 
-Confidence must change when contradictory evidence appears. Do not preserve an old conclusion just because work has already been invested in it.
+Before a write, know the exact target and expected effect. After a write, read back or test the result when that is practical.
 
-## 4. Information-gain rule
+If a tool returns much more data than needed, keep the useful excerpt and leave the rest out of the active context.
 
-Before any retrieval, tool call, experiment, or follow-up question, ask:
+## Prefer tests that can prove something
 
-> What uncertainty will this action reduce, and can its answer change what I do next?
+When several checks are available, start with the cheapest check that can distinguish between the likely explanations.
 
-If neither condition is satisfied, skip the action.
+For a bug this may be a focused test. For research it may be one primary source. For a deployment issue it may be the first failing health check rather than a full redeploy.
 
-Prefer actions with high expected information gain, low cost, and low side-effect risk.
+Passing an unrelated check is not evidence for the thing being investigated.
 
-## 5. Tool-use policy
+## Retries
 
-Classify tool calls as:
+Do not repeat the same failed action without changing anything.
 
-- **Read** — inspect state without mutation.
-- **Compute** — derive or transform information locally.
-- **Write** — mutate external state.
-- **Verify** — independently confirm a prior write or conclusion.
+Before retrying, classify the failure:
 
-Default ordering: `read -> compute -> write -> verify`.
+- bad input;
+- missing permission or credential;
+- unavailable dependency;
+- transient service failure;
+- wrong assumption;
+- actual product defect.
 
-Rules:
+Retry only when there is a reason the next attempt should behave differently.
 
-- Reuse stable identifiers returned by earlier calls instead of re-searching.
-- Batch independent reads when safe.
-- Serialize writes that touch the same resource or shared state.
-- Never assume a write succeeded from absence of an error; verify through a read when practical.
-- Do not perform destructive or externally visible writes when target or scope is ambiguous.
+## Decisions under uncertainty
 
-## 6. Assumption ledger
+Write down assumptions when both of these are true:
 
-Maintain only assumptions that can materially change the result. For each, track:
+1. the assumption affects the result in a meaningful way; and
+2. it cannot be verified cheaply right now.
 
-- assumption;
-- impact if false;
-- confidence;
-- cheapest validation;
-- fallback if validation is unavailable.
+Prefer reversible choices when uncertainty is high. Spend more time on a decision when it is costly to undo, changes public behavior, affects security, or commits a lot of future work.
 
-Validate existential assumptions before optimization assumptions. Example: verify that a dependency or endpoint exists before tuning its performance.
+## Keep context under control
 
-## 7. Decision protocol
+Do not paste entire logs, files, or search results when a few lines answer the question.
 
-When choosing among alternatives:
+Once a decision is settled, keep the decision and the reason. Drop most of the path taken to get there unless a failed path contains useful negative knowledge.
 
-1. define decision drivers and hard constraints;
-2. eliminate options that violate hard constraints;
-3. compare remaining options on value, complexity, risk, reversibility, and evidence;
-4. prefer the simplest option that satisfies current requirements;
-5. record what evidence would justify revisiting the choice.
+If a new phase begins, compact the previous phase before loading new material.
 
-Do not use scoring to manufacture precision. Scores are aids to reasoning, not substitutes for evidence.
+## Before saying the work is done
 
-## 8. Failure-recovery protocol
+Check the result against the request.
 
-When an action fails:
+For code or repository work, ask:
 
-1. preserve the first causal error and relevant environment/state;
-2. classify the failure: bad assumption, bad input, product defect, environment, permission, dependency, transient external failure, or tool misuse;
-3. change the next attempt only if the classification suggests a new hypothesis;
-4. do not retry an unchanged action repeatedly;
-5. after the retry budget is exhausted, surface the blocker with evidence and the safest next option.
+- was the intended file or behavior actually changed?
+- were the relevant checks run?
+- is the working tree or branch in the expected state?
+- did the change introduce a new assumption that should be documented?
 
-Retries are justified by evidence of transience, not hope.
+For research or analysis, ask:
 
-## 9. Token and context economics
+- are important claims supported?
+- are disagreements between sources visible?
+- are limitations stated where they matter?
 
-Use context as working memory, not an archive.
+If the evidence is not strong enough, say what is missing instead of filling the gap with confidence.
 
-- Load only the smallest source slice needed for the current decision.
-- Replace repeated narrative with structured state.
-- Reference large artifacts instead of embedding them.
-- Compact after a decision becomes stable or a phase ends.
-- Preserve exact identifiers, commands, constraints, numerical thresholds, and unresolved blockers.
-- Drop abandoned branches unless they contain negative knowledge that prevents repeated failure.
+## Stop conditions
 
-The router should normally load one primary skill and at most two companions.
+Stop when the requested artifact exists and the available evidence is sufficient for the requested confidence level.
 
-## 10. Output validation
-
-Before returning or committing an artifact, check:
-
-- Does it satisfy the user's actual requested deliverable?
-- Are all high-impact claims supported or clearly marked uncertain?
-- Are constraints and non-goals respected?
-- Is there accidental scope expansion?
-- Are next actions concrete and ordered?
-- If execution occurred, is there verification evidence?
-- Could another actor continue without hidden context?
-
-## 11. Stop conditions
-
-Stop when all mandatory acceptance conditions are met and no unresolved high-severity unknown can plausibly invalidate the result.
-
-Continue only if another iteration has a credible path to changing the decision, artifact, or verification outcome.
-
-Escalate rather than guess when the missing information is high-impact, unavailable, and cannot be safely inferred.
-
-## 12. Safety and scope boundaries
-
-- Preserve user-owned changes and unrelated work.
-- Never expose secrets, credentials, private keys, or sensitive personal data in outputs or logs.
-- Prefer reversible actions under uncertainty.
-- For production, destructive, financial, legal, security-sensitive, or permission-changing actions, require stronger verification and explicit target clarity.
-- A skill cannot override higher-priority system, safety, or user constraints.
+Ask for help or escalate when a missing fact is high impact and cannot be inferred safely, when permission is missing, or when a destructive/write target is ambiguous.

@@ -1,27 +1,31 @@
 ---
 name: release-readiness
-description: Assess whether a change is safe to release.
+description: Check whether a change is safe to ship, not merely whether the build is green.
 ---
 
-# release-readiness
+# Release readiness
 
-## When to use
+Use this before a deployment, tagged release, or change that is difficult to undo.
 
-Use before deployment, merge, launch, publication, or handoff.
+## Check the change itself
 
-## Workflow
+- intended behavior is covered by the relevant tests;
+- configuration changes are documented and have sane defaults;
+- database or data migrations have been rehearsed where practical;
+- backward compatibility is understood;
+- security-sensitive changes received appropriate review;
+- operational dashboards or alerts can reveal a bad rollout.
 
-1. Check tests, migrations, configuration, dependencies, observability, security, documentation, and rollback.
-2. Identify blockers separately from follow-up improvements.
-3. Verify ownership and post-release monitoring.
+## Check the rollout
 
-## Output contract
+Know how the change will be enabled, how quickly it can be disabled, and what signal would trigger rollback.
 
-A go/no-go assessment with blockers and rollback plan.
+A rollback plan should be specific enough to execute. “Revert if needed” is not a rollback plan when schema or external state has changed.
 
-## Guardrails
+## Check user impact
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+Call out changed behavior, removed options, new permissions, migration steps, or anything users/operators need to do differently.
+
+Do not claim readiness based only on CI. CI can prove useful things, but it cannot prove that a migration is reversible or that production credentials and dependencies are configured correctly.
+
+See also: `security-review`, `observability-plan`, `git-commit`, `pull-request`.

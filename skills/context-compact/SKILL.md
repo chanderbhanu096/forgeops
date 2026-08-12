@@ -1,96 +1,43 @@
 ---
 name: context-compact
-description: Compress large working context into a loss-minimized continuation state for another model turn or agent.
+description: Reduce a long working context without losing the details needed to continue the job.
 ---
 
-# context-compact
+# Context compact
 
-## Mission
+Use this when the conversation or working notes have become large enough that the same facts keep getting repeated.
 
-Reduce context cost while preserving every fact that can change future decisions or execution.
+The result is not a summary for a reader. It is a replacement working state for the next turn or the next person.
 
-## Trigger conditions
+## Keep
 
-- Conversation or task history is long enough that repetition is consuming context.
-- A handoff, checkpoint, or model switch is approaching.
-- The agent needs a stable state snapshot before a risky or multi-step phase.
+- the current goal and what counts as finished;
+- hard constraints and user preferences;
+- decisions that still affect the work;
+- exact paths, commands, IDs, versions, numbers, and URLs that will be needed again;
+- verified findings;
+- failed attempts that should not be repeated;
+- blockers and the next action.
 
-## Do not use when
+## Drop
 
-- The source context is already short and active details are still changing rapidly.
-- The user explicitly needs a verbatim transcript rather than a working-state summary.
+- greetings and filler;
+- repeated explanations;
+- abandoned ideas that no longer affect the plan;
+- large logs once the important lines are known;
+- old implementation detail already captured in a file or commit.
 
-## Inputs to establish
+## Method
 
-Before executing, establish only the inputs that materially affect the result:
+1. Write the objective in one or two sentences.
+2. Pull out non-negotiable constraints.
+3. Record the current state as facts, not as a chronological story.
+4. Keep assumptions separate from verified information.
+5. Record decisions only with enough rationale to understand why they were made.
+6. End with the next concrete action and how to check it.
 
-- Current objective and success criteria
-- Hard constraints and user preferences
-- Decisions already made and their rationale
-- Verified evidence, identifiers, paths, commands, numbers, and URLs
-- Open questions, blockers, failed attempts, and next actions
+Before finishing, imagine handing the compacted text to someone who cannot see the original conversation. If they would immediately need to ask what repository, branch, command, blocker, or decision you meant, the compaction removed too much.
 
-Do not ask the user for an input that can be safely inferred from supplied context or retrieved from an authoritative source. Mark inferred values as assumptions until verified.
+Aim for a large reduction, but do not chase a fixed percentage. A 20-line incident can need more exact state than a 200-line brainstorming session.
 
-## Operating protocol
-
-1. Partition context into invariant facts, decisions, evidence, active work, and disposable history.
-2. Promote exact values that future execution depends on; never paraphrase identifiers, commands, paths, version numbers, or thresholds.
-3. Collapse repeated discussion into the latest settled decision and record superseded choices only when reversal risk exists.
-4. Separate verified facts from assumptions and unresolved hypotheses.
-5. Encode current execution state: what is done, what is in progress, what failed, and the next smallest safe action.
-6. Run a loss audit: ask whether a fresh agent could continue correctly using only the compacted state.
-
-## Advanced heuristics
-
-- Use delta compression: preserve what changed since the previous checkpoint instead of re-summarizing everything.
-- Keep rationale only for decisions likely to be questioned or reversed.
-- Represent lists and state machines structurally; use prose only for nuance.
-- Prefer one canonical statement of each fact to multiple paraphrases.
-
-## Failure modes to actively prevent
-
-- Deleting a constraint because it appeared only once.
-- Mixing guesses with verified state.
-- Producing a narrative summary that is pleasant to read but unusable for continuation.
-
-## Evidence discipline
-
-- Separate **observed**, **inferred**, and **unknown** information.
-- Preserve provenance for claims that can change the decision.
-- Prefer a discriminating test or authoritative source over additional speculation.
-- If evidence contradicts the working theory, update the theory instead of rationalizing the evidence away.
-
-## Output contract
-
-Return the smallest useful artifact containing, as applicable:
-
-- Objective
-- Non-negotiable constraints
-- Current verified state
-- Decisions and rationale
-- Open risks/blockers
-- Next actions
-- Discarded/superseded context worth remembering
-
-The output should be usable by the next actor without needing hidden reasoning or unstated context.
-
-## Token and context discipline
-
-Target 10-25% of the source context. Expand only when compression would create ambiguity or erase an execution-critical detail.
-
-- Do not repeat source material unless exact wording is required.
-- Keep large logs, documents, and code outside the active context; quote or load only decisive slices.
-- Compact stable conclusions before opening a new exploration branch.
-
-## Stop / escalate rules
-
-Stop when a fresh agent can state the goal, constraints, current state, and next action without consulting the original context.
-
-Escalate instead of guessing when a missing fact is both high-impact and not safely inferable or retrievable. For write/destructive actions, stop if target or scope is ambiguous.
-
-## Composition
-
-Common companion skills: `handover`, `token-budget`, `context-router`
-
-Load companions only for the phase where they add value; do not chain skills mechanically.
+See also: `handover`, `token-budget`, `context-router`.

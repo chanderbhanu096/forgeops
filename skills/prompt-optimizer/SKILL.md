@@ -1,27 +1,31 @@
 ---
 name: prompt-optimizer
-description: Rewrite a prompt to be clearer, shorter, testable, and less ambiguous while preserving intent.
+description: Clean up a prompt so the important behavior is clear and unnecessary instructions stop consuming context.
 ---
 
-# prompt-optimizer
+# Prompt optimizer
 
-## When to use
+Use this when a prompt has grown through repeated edits, contains overlapping rules, or produces inconsistent behavior.
 
-Use when a prompt is verbose, conflicting, underspecified, or expensive to run.
+Do not optimize a prompt by making it sound more formal. Optimize it by removing ambiguity and repetition.
 
-## Workflow
+## Work through it in this order
 
-1. Extract objective, inputs, constraints, tools, and output format.
-2. Remove duplicated instructions and resolve conflicts explicitly.
-3. Add only missing constraints that materially improve execution.
+1. Write down the actual task and expected output.
+2. Separate hard rules from preferences.
+3. Remove duplicate instructions, especially rules stated once positively and again negatively.
+4. Move examples next to the rule they illustrate.
+5. Resolve contradictions explicitly instead of relying on instruction order by accident.
+6. Replace broad phrases such as “be accurate” with behavior that can be checked.
+7. Keep tool rules close to the actions they govern.
+8. Add a stop condition if the prompt tends to keep exploring after the job is done.
 
-## Output contract
+A sentence earns its place when removing it would change scope, behavior, tool use, evidence requirements, output format, or stopping behavior.
 
-An optimized prompt plus a short note on material changes.
+## Check the result
 
-## Guardrails
+Try a normal case, a borderline case, and a case where the model should refuse or stop. If the rewritten prompt only works for the happy path, it is not finished.
 
-- Load this skill only when it materially improves the task.
-- Prefer concrete evidence over assumptions.
-- Keep the result proportional to the user's requested depth.
-- Do not repeat context that is already available unless it is needed for the output.
+Avoid giant collections of “never do X” rules when one positive instruction describes the intended behavior more clearly.
+
+See also: `token-budget`, `context-router`, `stop-condition`.

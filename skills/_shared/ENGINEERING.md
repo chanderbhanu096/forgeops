@@ -1,71 +1,51 @@
----
-name: engineering-protocol
-scope: category
----
+# Engineering notes
 
-# Engineering Protocol
+Use these notes for repository work, debugging, testing, refactors, CI, interfaces, and system design.
 
-Applies to: `codebase-orient`, `debug`, `root-cause-analysis`, `minimal-fix`, `refactor-safely`, `code-review`, `test-strategy`, `test-failure-triage`, `ci-debug`, `dependency-audit`, `api-design`, `system-design`, `architecture-tradeoffs`, `data-modeling`.
+## Start by finding the change surface
 
-## Objective
+Do not read the repository from top to bottom.
 
-Make the smallest correct engineering decision with explicit invariants, realistic failure behavior, and verification proportional to blast radius.
+Find the entry point, the code path related to the task, its tests, and the configuration that controls it. Expand outward only when evidence requires it.
 
-## Codebase orientation
+## Debug from a reproduction
 
-Before editing unfamiliar code, identify:
+A useful debugging loop is:
 
-- entry point;
-- execution path relevant to the task;
-- state boundaries;
-- configuration that changes runtime behavior;
-- external interfaces;
-- existing tests and intended behavior;
-- generated or vendor-managed files that should not be edited manually.
+```text
+reproduce -> narrow -> form one explanation -> run a discriminating check -> update the explanation
+```
 
-Stop orienting when the likely change surface and validation path are clear.
+Do not change several unrelated things between observations. That makes a successful run hard to explain and a failed run hard to learn from.
 
-## Debugging loop
+## Fix the cause before the shape
 
-Use:
+Prefer the smallest change that fixes the verified cause and preserves existing behavior elsewhere.
 
-`reproduce -> locate earliest divergence -> rank hypotheses -> discriminating test -> verified cause -> minimal fix -> regression test`.
+A larger cleanup can be useful, but it should not be smuggled into a bug fix when it makes verification harder.
 
-Do not perform shotgun edits. One causal variable per diagnostic experiment whenever practical.
+## Tests
 
-## Invariant-first design
+Choose tests based on failure risk.
 
-For APIs, schemas, and architecture, write down the invariants that must remain true under:
+A focused regression test is usually the first check for a local bug. Broader tests matter when the change crosses package, process, API, or persistence boundaries.
 
-- retries;
-- duplicate requests;
-- partial failure;
-- concurrency;
-- stale reads;
-- dependency outage;
-- migration;
-- rollback.
+A passing test is useful only if it exercises the behavior being claimed.
 
-Choose components only after these constraints and workload characteristics are explicit.
+## Refactors
 
-## Test economics
+State which behavior must remain unchanged. Keep behavior-preserving changes separate from intentional behavior changes where possible.
 
-Test at the lowest layer that reliably catches the target failure mode. Use integration/contract tests at boundaries where mocks can hide incompatibility. Keep end-to-end tests focused on critical journeys.
+If the refactor changes interfaces, data shape, error handling, timing, or side effects, treat those as behavior changes and test them explicitly.
 
-Coverage percentage is not a substitute for risk coverage.
+## Review
 
-## Refactoring rule
+Prioritize correctness, security, regressions, and missing tests over style preferences.
 
-Separate behavior changes from structure changes. Characterize under-specified behavior before refactoring it. Stop when the targeted maintainability problem is solved.
+A review comment should explain the concrete failure mode, the evidence, and a practical fix. Avoid comments that amount to personal formatting preference unless the repository has an established rule.
 
-## Review severity
+## CI
 
-A review finding should include:
+When CI fails but local work passes, compare environment details first: runtime versions, dependency lockfiles, paths, services, environment variables, permissions, and caches.
 
-- concrete failure mode;
-- reachable conditions;
-- impact;
-- evidence/confidence;
-- practical remediation.
-
-Do not bury correctness defects beneath style comments.
+Retrying a flaky-looking job is fine once; repeated retries are not a diagnosis.

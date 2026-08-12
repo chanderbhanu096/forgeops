@@ -1,136 +1,99 @@
 ---
 name: skill-router
-description: Route a task to the smallest sufficient combination of a domain skill and inherited advanced execution protocols.
-version: 2
+description: Pick the smallest useful set of skills for the task at hand.
 ---
 
-# Skill Router
+# Skill router
 
-## Purpose
+Use this file when it is not obvious which skill should handle a task.
 
-This file is the entry point for the skill library. The library is deliberately layered so sophistication does not require duplicating the same reliability rules across 50 files.
+The basic rule is simple: pick one primary skill for the work being done now. Add at most two related skills if they cover a separate concern. Do not load the whole library.
 
-A loaded skill is interpreted as:
+## First decide what kind of work this is
 
-`advanced core protocol + category protocol + primary domain skill (+ optional companion skills)`
+A task normally starts in one of these places:
 
-## Mandatory inheritance
+- understand something
+- explore options
+- make a decision
+- plan work
+- implement a change
+- verify a result
+- deliver or publish a change
+- hand work to someone else
 
-When any skill under `skills/*/SKILL.md` is invoked through this router:
+Choose the skill whose output is closest to what the user actually asked for.
 
-1. Apply `skills/_shared/CORE.md`.
-2. Apply the category protocol that contains the skill.
-3. Load the skill's own `SKILL.md` for domain-specific method.
-4. Load at most two companion skills only when they address a separate risk or phase.
+## Shared files
 
-The shared protocol is inherited behavior. It does not need to be copied into every skill file.
+Every skill can use `skills/_shared/CORE.md` for common rules around evidence, tool calls, writes, retries, and verification.
 
-## Category mapping
+Then use the shared file for the relevant area:
 
-### Context and token efficiency
+- context and prompts: `_shared/CONTEXT.md`
+- planning and decisions: `_shared/THINKING.md`
+- research: `_shared/RESEARCH.md`
+- software work: `_shared/ENGINEERING.md`
+- release, security, and operational work: `_shared/DELIVERY.md`
 
-Protocol: `skills/_shared/CONTEXT.md`
+These are supporting notes, not prerequisites that must be copied into the prompt every time. If the current task does not need a shared section, do not load it.
 
-Skills: `context-compact`, `handover`, `prompt-optimizer`, `context-router`, `token-budget`, `response-compressor`, `progressive-disclosure`, `retrieval-first`, `tool-call-planner`, `stop-condition`.
+## Common routes
 
-### Thinking and planning
+Ambiguous request:
 
-Protocol: `skills/_shared/THINKING.md`
+```text
+problem-framing -> requirements-clarifier -> task-decomposer
+```
 
-Skills: `brainstorm`, `idea-evaluator`, `problem-framing`, `requirements-clarifier`, `task-decomposer`, `execution-plan`, `project-kickoff`, `decision-record`, `assumption-audit`, `risk-register`.
+New idea:
 
-### Research and knowledge
+```text
+brainstorm -> idea-evaluator -> experiment-design
+```
 
-Protocol: `skills/_shared/RESEARCH.md`
+Research question:
 
-Skills: `research-plan`, `source-synthesizer`, `fact-check`, `summarizer`, `structured-extractor`, `experiment-design`, `retrospective`, `learning-mode`.
+```text
+research-plan -> retrieval-first -> source-synthesizer -> fact-check
+```
 
-### Engineering and architecture
+Bug:
 
-Protocol: `skills/_shared/ENGINEERING.md`
+```text
+codebase-orient -> debug -> minimal-fix -> test-strategy
+```
 
-Skills: `codebase-orient`, `debug`, `root-cause-analysis`, `minimal-fix`, `refactor-safely`, `code-review`, `test-strategy`, `test-failure-triage`, `ci-debug`, `dependency-audit`, `api-design`, `system-design`, `architecture-tradeoffs`, `data-modeling`.
+Refactor:
 
-### Quality, security, operations, and delivery
+```text
+codebase-orient -> refactor-safely -> test-strategy -> code-review
+```
 
-Protocol: `skills/_shared/DELIVERY.md`
+New API or service:
 
-Skills: `security-review`, `threat-model`, `performance-analysis`, `observability-plan`, `documentation-writer`, `release-readiness`, `git-commit`, `pull-request`.
+```text
+requirements-clarifier -> api-design/system-design -> threat-model -> test-strategy
+```
 
-## Routing algorithm
+Release:
 
-### Step 1: classify the active phase
+```text
+code-review -> security-review -> release-readiness -> git-commit -> pull-request
+```
 
-Choose exactly one primary phase:
+Long session:
 
-- **understand** — clarify, orient, frame, or retrieve;
-- **explore** — brainstorm, compare, or discover options;
-- **decide** — evaluate alternatives or record a decision;
-- **plan** — decompose, sequence, or assess risk;
-- **implement** — change code, data, prompts, or artifacts;
-- **verify** — test, review, fact-check, or measure;
-- **deliver** — document, commit, release, or open a PR;
-- **handoff** — compact and transfer state.
+```text
+token-budget -> context-compact -> handover
+```
 
-### Step 2: choose one primary skill
+## A few things not to do
 
-Pick the skill whose output contract most directly matches the user's requested deliverable.
+- Do not load skills just because their names sound related.
+- Do not repeat a skill if its result is already in the context.
+- Do not keep exploration notes in the active prompt once the task has moved to implementation.
+- Do not continue through a chain after the requested result is finished.
+- Do not use extra skills as a substitute for asking one necessary question.
 
-Do not choose a skill merely because it is adjacent to the topic.
-
-### Step 3: decide whether companions are needed
-
-A companion skill is justified only if it handles one of:
-
-- a distinct high-risk boundary;
-- an independent evidence problem;
-- a required transition into the next phase.
-
-Default maximum: two companions.
-
-### Step 4: execute until the primary skill stops
-
-Use the primary skill's stop condition plus the inherited stop rules in `CORE.md`.
-
-Do not mechanically continue through a pre-written chain if the user's requested artifact is already complete.
-
-### Step 5: re-route on phase transition
-
-Once a phase is complete, compact durable state and choose a new primary skill only if more work is genuinely required.
-
-## Canonical routes
-
-- Ambiguous request: `problem-framing -> requirements-clarifier -> task-decomposer`
-- New product/project idea: `brainstorm -> idea-evaluator -> experiment-design`
-- Research question: `research-plan -> retrieval-first -> source-synthesizer -> fact-check`
-- Bug: `codebase-orient -> debug -> minimal-fix -> test-strategy`
-- Incident: `debug -> root-cause-analysis -> observability-plan -> retrospective`
-- Refactor: `codebase-orient -> refactor-safely -> test-strategy -> code-review`
-- New API: `requirements-clarifier -> api-design -> threat-model -> test-strategy`
-- New system: `requirements-clarifier -> system-design -> architecture-tradeoffs -> threat-model`
-- Performance issue: `performance-analysis -> observability-plan -> experiment-design`
-- Release: `code-review -> security-review -> release-readiness -> git-commit -> pull-request`
-- Context pressure: `token-budget -> context-compact`; add `handover` only at an ownership/session boundary.
-
-## Anti-patterns
-
-Do not:
-
-- load all 50 skills;
-- use more skills as a substitute for clearer problem framing;
-- re-run a skill whose output contract is already satisfied;
-- carry detailed exploration history into delivery phases;
-- load engineering/security protocols for unrelated writing or ideation tasks;
-- use a companion merely because another skill references it.
-
-## Router output
-
-When explicit routing output is useful, return only:
-
-- primary skill;
-- inherited category protocol;
-- optional companions;
-- why each is needed;
-- stop condition for the current phase.
-
-Normally this routing remains implicit and the agent proceeds directly to useful work.
+When a phase is finished, keep the useful state, drop the rest, and choose a new primary skill only if more work remains.
