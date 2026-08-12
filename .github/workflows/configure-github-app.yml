@@ -1,0 +1,68 @@
+name: Configure GitHub App
+
+on:
+  workflow_run:
+    workflows: ["CI / CD"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-24.04
+    environment: ${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Store GitHub integration secrets
+        env:
+          PRIVATE_KEY: ${{ secrets.FORGEOPS_GITHUB_APP_PRIVATE_KEY }}
+          MCP_SECRET: ${{ secrets.MCP_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "${PRIVATE_KEY}"
+          test -n "${MCP_SECRET}"
+          az containerapp secret set \
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
+            --secrets \
+              "github-app-private-key=${PRIVATE_KEY}" \
+              "mcp-secret=${MCP_SECRET}"
+
+      - name: Configure API GitHub App environment
+        run: |
+          set -euo pipefail
+          test -n "${{ secrets.FORGEOPS_GITHUB_APP_ID }}"
+          test -n "${{ secrets.FORGEOPS_GITHUB_INSTALLATION_ID }}"
+          az containerapp update \
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
+            --set-env-vars \
+              "GITHUB_API_URL=https://api.github.com" \
+              "FORGEOPS_GITHUB_APP_ID=${{ secrets.FORGEOPS_GITHUB_APP_ID }}" \
+              "FORGEOPS_GITHUB_APP_PRIVATE_KEY=secretref:github-app-private-key" \
+              "FORGEOPS_GITHUB_INSTALLATION_ID=${{ secrets.FORGEOPS_GITHUB_INSTALLATION_ID }}" \
+              "MCP_SECRET=secretref:mcp-secret"
+
+      - name: Verify API revision
+        run: |
+          API_URL=$(az containerapp show \
+            --name "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-api" \
+            --resource-group "forgeops-${{ vars.DEPLOY_ENVIRONMENT || 'staging' }}-rg" \
+            --query "properties.latestRevisionFqdn" -o tsv)
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent "https://${API_URL}/health" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1

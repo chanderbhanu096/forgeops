@@ -18,18 +18,20 @@ from forgeops.agent.evidence_policy import (
     validate_retrieved_evidence,
 )
 from forgeops.agent.handlers import (
-    handle_environment_discovery,
-    handle_evidence_collection,
     handle_execution,
     handle_hypothesis_creation,
     handle_hypothesis_verification,
-    handle_plan_generation,
     handle_post_action_monitoring,
     handle_sandbox_execution,
     handle_solution_generation,
     handle_test_and_review,
 )
 from forgeops.agent.model_selection import reset_model_selection, set_model_selection
+from forgeops.agent.repository_review import (
+    handle_environment_discovery,
+    handle_evidence_collection,
+    handle_plan_generation,
+)
 from forgeops.approval_service import ensure_pending_approval
 from forgeops.config import get_settings
 from forgeops.models.orm import AgentState, Mission, MissionStatus, StateTransition
@@ -41,7 +43,11 @@ TRANSITIONS: dict[AgentState | None, list[AgentState]] = {
     AgentState.mission_received: [AgentState.environment_discovery, AgentState.failed],
     AgentState.environment_discovery: [AgentState.plan_generation, AgentState.failed],
     AgentState.plan_generation: [AgentState.evidence_collection, AgentState.failed],
-    AgentState.evidence_collection: [AgentState.hypothesis_creation, AgentState.failed],
+    AgentState.evidence_collection: [
+        AgentState.hypothesis_creation,
+        AgentState.completed,
+        AgentState.failed,
+    ],
     AgentState.hypothesis_creation: [AgentState.hypothesis_verification, AgentState.failed],
     AgentState.hypothesis_verification: [
         AgentState.solution_generation,
@@ -167,7 +173,7 @@ class AgentRuntime:
                     )
                     return
 
-            next_state = self._next_runnable_state(mission.current_state)
+            next_state = self._next_runnable_state(mission.current_state, ctx)
             if next_state is None:
                 break
 
@@ -243,7 +249,16 @@ class AgentRuntime:
         finally:
             reset_model_selection(token)
 
-    def _next_runnable_state(self, current: AgentState | None) -> AgentState | None:
+    def _next_runnable_state(
+        self,
+        current: AgentState | None,
+        ctx: MissionContext,
+    ) -> AgentState | None:
+        if (
+            current == AgentState.evidence_collection
+            and ctx.scratchpad.get("mission_mode") == "repository_overview"
+        ):
+            return AgentState.completed
         for successor in TRANSITIONS.get(current, []):
             if successor != AgentState.failed:
                 return successor

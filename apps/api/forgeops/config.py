@@ -92,13 +92,27 @@ class Settings(BaseSettings):
     fast_model: str = "gpt-4o-mini"
 
     # ── MCP ───────────────────────────────────────────────────────────────────
-    mcp_secret: SecretStr = Field(default=SecretStr("forgeops_mcp_dev"))
-    mcp_github_url: str = "http://mcp-github:8001"
+    mcp_secret: SecretStr = Field(
+        default=SecretStr("forgeops_mcp_dev"), alias="MCP_SECRET"
+    )
+    mcp_github_url: str = Field(
+        default="http://mcp-github:8001", alias="MCP_GITHUB_URL"
+    )
     mcp_data_url: str = "http://mcp-data:8002"
     mcp_knowledge_url: str = "http://mcp-knowledge:8003"
 
     # ── GitHub ────────────────────────────────────────────────────────────────
-    github_token: SecretStr = Field(default=SecretStr(""))
+    # A GitHub App installation is the production default. GITHUB_TOKEN remains
+    # a local-development fallback and is never exposed to the browser.
+    github_api_url: str = Field(default="https://api.github.com", alias="GITHUB_API_URL")
+    github_token: SecretStr = Field(default=SecretStr(""), alias="GITHUB_TOKEN")
+    github_app_id: str = Field(default="", alias="FORGEOPS_GITHUB_APP_ID")
+    github_app_private_key: SecretStr = Field(
+        default=SecretStr(""), alias="FORGEOPS_GITHUB_APP_PRIVATE_KEY"
+    )
+    github_app_installation_id: str = Field(
+        default="", alias="FORGEOPS_GITHUB_INSTALLATION_ID"
+    )
 
     # ── Observability ─────────────────────────────────────────────────────────
     langfuse_public_key: str = ""

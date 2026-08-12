@@ -1,5 +1,12 @@
 """Regression tests for provider tool-call safety."""
-from forgeops.agent.gateway import normalize_tool_choice, sanitize_tool_calls
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import httpx
+import pytest
+from openai import BadRequestError
+
+from forgeops.agent.gateway import ModelGateway, normalize_tool_choice, sanitize_tool_calls
 
 TOOLS = [
     {
@@ -66,3 +73,49 @@ def test_invalid_json_tool_argument_is_rejected() -> None:
         }
     ]
     assert sanitize_tool_calls(calls, TOOLS) is None
+
+
+@pytest.mark.asyncio
+async def test_unsolicited_tool_call_error_retries_as_content_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+    response = httpx.Response(400, request=request)
+    conflict = BadRequestError(
+        "Tool choice is none, but model called a tool",
+        response=response,
+        body={"error": {"message": "Tool choice is none, but model called a tool"}},
+    )
+    completion = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content='{"ok":true}', tool_calls=None),
+                finish_reason="stop",
+            )
+        ],
+        usage=SimpleNamespace(prompt_tokens=10, completion_tokens=4),
+    )
+    create = AsyncMock(side_effect=[conflict, completion])
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
+    gateway = ModelGateway()
+    monkeypatch.setattr(gateway, "_get_openai_client", lambda provider: fake_client)
+
+    result = await gateway._openai_compatible_chat(
+        provider="groq",
+        messages=[{"role": "user", "content": "Return JSON"}],
+        model="openai/gpt-oss-20b",
+        tools=None,
+        tool_choice=None,
+        temperature=0.1,
+        max_tokens=100,
+        response_format={"type": "json_object"},
+    )
+
+    assert result.content == '{"ok":true}'
+    assert create.await_count == 2
+    retry_kwargs = create.await_args_list[1].kwargs
+    assert "tools" not in retry_kwargs
+    assert "tool_choice" not in retry_kwargs
+    assert "Tool calling is unavailable" in retry_kwargs["messages"][0]["content"]

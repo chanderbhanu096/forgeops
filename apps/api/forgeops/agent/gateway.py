@@ -34,11 +34,7 @@ def normalize_tool_choice(
     tools: list[dict[str, Any]] | None,
     tool_choice: str | None,
 ) -> str | None:
-    """Return a provider-safe tool choice.
-
-    A tool-enabled request must never send ``none``. Some OpenAI-compatible
-    providers reject that combination after the model emits a tool call.
-    """
+    """Return a provider-safe tool choice."""
     if not tools:
         return None
     normalized = (tool_choice or "auto").strip().lower()
@@ -116,6 +112,22 @@ def _is_tool_choice_conflict(exc: BadRequestError) -> bool:
     return "tool choice is none" in message or (
         "tool_choice" in message and "tool" in message and "none" in message
     )
+
+
+def _tool_suppressed_messages(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Make a content-only retry explicit for models that invent tool calls."""
+    guard = {
+        "role": "system",
+        "content": (
+            "Tool calling is unavailable for this request. Do not emit a function call, "
+            "tool name, tool JSON, XML tool tag, or arguments object. Return only the "
+            "requested assistant content. When JSON is requested, return one valid JSON "
+            "object as ordinary text."
+        ),
+    }
+    return [guard, *messages]
 
 
 class ModelGateway:
@@ -285,10 +297,25 @@ class ModelGateway:
         try:
             completion = await client.chat.completions.create(**kwargs)
         except BadRequestError as exc:
-            if not tools or not _is_tool_choice_conflict(exc):
+            if not _is_tool_choice_conflict(exc):
                 raise
-            log.warning("tool_choice_conflict_recovered", provider=provider, model=model)
-            kwargs["tool_choice"] = "auto"
+            if tools:
+                log.warning(
+                    "tool_choice_conflict_recovered",
+                    provider=provider,
+                    model=model,
+                    mode="tool_enabled",
+                )
+                kwargs["tool_choice"] = "auto"
+            else:
+                log.warning(
+                    "unsolicited_tool_call_recovered",
+                    provider=provider,
+                    model=model,
+                )
+                kwargs.pop("tools", None)
+                kwargs.pop("tool_choice", None)
+                kwargs["messages"] = _tool_suppressed_messages(messages)
             completion = await client.chat.completions.create(**kwargs)
 
         choice = completion.choices[0]
